@@ -1,0 +1,141 @@
+Estado del proyecto + Pendientes + Recomendación
+
+  ---
+  📊 Estado actual
+
+  Lo que funciona en producción ahora mismo
+
+  🌐 URL pública: https://myalbum-green.vercel.app
+
+  ┌─────────────────────────────────────────┬────────────────────────────────────────────────────────────────┐
+  │                  Capa                   │                             Estado                             │
+  ├─────────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
+  │ Frontend (Next.js + Tailwind)           │ ✅  Deploy en Vercel free tier                                  │
+  ├─────────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
+  │ IA Background Removal (@imgly via CDN)  │ ✅  Procesa 100% en navegador                                   │
+  ├─────────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
+  │ Composición canvas con plantillas       │ ✅  3 modos: transform / safe_area / cover                      │
+  ├─────────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
+  │ Editor drag & resize del cutout         │ ✅  Mouse + touch                                               │
+  ├─────────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
+  │ Persistencia en Supabase                │ ✅  Storage + tabla photos con template_id FK                   │
+  ├─────────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
+  │ Plantilla Ecuador real (Panini sticker) │ ✅  Vivo en Supabase Storage + DB con safe_area                 │
+  ├─────────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
+  │ Galería con lightbox                    │ ✅  Lee de Supabase                                             │
+  ├─────────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
+  │ Diseño Mundial 2026 Premium             │ ✅  Hero cinematográfico + glassmorphism + banderas USA/MEX/CAN │
+  ├─────────────────────────────────────────┼────────────────────────────────────────────────────────────────┤
+  │ Responsive mobile + desktop             │ ✅                                                              │
+  └─────────────────────────────────────────┴────────────────────────────────────────────────────────────────┘
+
+  Arquitectura final
+
+  ┌──────────────────────────────────────────┐
+  │  Browser (cliente)                       │
+  │   ├─ Next.js bundle (75 KB)              │
+  │   ├─ @imgly desde esm.sh CDN             │
+  │   ├─ Canvas composition local            │
+  │   └─ Foto WebP servida por Vercel        │
+  └────────────────┬─────────────────────────┘
+                   │
+                   ▼
+  ┌──────────────────────────────────────────┐
+  │  Vercel (free tier)                      │
+  │   └─ Static pages + assets               │
+  └────────────────┬─────────────────────────┘
+                   │
+                   ▼
+  ┌──────────────────────────────────────────┐
+  │  Supabase (free tier)                    │
+  │   ├─ Tabla photos (UUIDs + URLs)         │
+  │   ├─ Tabla templates (Ecuador + futuras) │
+  │   ├─ Bucket photos (cutouts PNG)         │
+  │   └─ Bucket templates (sticker JPGs)     │
+  └──────────────────────────────────────────┘
+
+  ---
+  🟡  Pendientes de la planificación original
+
+  Fase 1+ del plan grande "MyAlbum 2.0 — Admin + Invitaciones"
+
+  ┌──────┬──────────────────────────────────────────────────────┬───────────────┬─────────────────────────────────────┐
+  │ Fase │                        Tarea                         │ Tiempo estim. │               Impacto               │
+  ├──────┼──────────────────────────────────────────────────────┼───────────────┼─────────────────────────────────────┤
+  │ 1    │ Autenticación (login + registro Supabase Auth)       │ 2-3 h         │ Cada usuario tiene identidad propia │
+  ├──────┼──────────────────────────────────────────────────────┼───────────────┼─────────────────────────────────────┤
+  │ 2    │ Schema: profiles, albums, album_members, invitations │ 1 h           │ Soporte multi-álbum                 │
+  ├──────┼──────────────────────────────────────────────────────┼───────────────┼─────────────────────────────────────┤
+  │ 3    │ Páginas admin CRUD de álbumes                        │ 3-4 h         │ Vos administrás; otros usan         │
+  ├──────┼──────────────────────────────────────────────────────┼───────────────┼─────────────────────────────────────┤
+  │ 4    │ QR + invitaciones (página /join/[token])             │ 2-3 h         │ Compartir álbum vía QR              │
+  ├──────┼──────────────────────────────────────────────────────┼───────────────┼─────────────────────────────────────┤
+  │ 5    │ Vista usuario: /albumes + /albumes/[id]              │ 2-3 h         │ Cada user ve sus álbumes            │
+  └──────┴──────────────────────────────────────────────────────┴───────────────┴─────────────────────────────────────┘
+
+  Total: 10-14 h de trabajo, en varias sesiones.
+
+  Otros pendientes menores
+
+  ┌──────────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────────────────────┐
+  │                         Item                         │                                           Notas                                           │
+  ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 📋 Inpainting (eliminar persona + reconstruir fondo) │ Documentado en TODO.md. Plan B: Hugging Face Inference API listo para retomar.            │
+  ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 📋 Nombre dinámico en banda del sticker              │ Hoy la banda queda vacía. Habría que overlayear texto en el canvas al componer.           │
+  ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 📋 Más plantillas reales en Supabase                 │ Vos podés subir más cuando quieras, sin tocar código.                                     │
+  ├──────────────────────────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────┤
+  │ 📋 CI/CD con GitHub                                  │ Hoy deployás con vercel --prod. Conectando a un repo GitHub se auto-deploya en cada push. │
+  └──────────────────────────────────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────┘
+
+  ---
+  💡 Mi recomendación de orden
+
+  Te propongo este orden, ordenado por mejor ROI (impacto vs esfuerzo):
+
+  Opción 1 — "Pulir y consolidar" (recomendado si querés cerrar bien) ⭐
+
+  ~2 horas
+
+  1. Nombre dinámico en sticker (45 min) — alta visibilidad, baja complejidad, valor inmediato (el usuario ve su nombre en su sticker)
+  2. Subir 3-5 plantillas más (sin código, 30 min) — Brasil, Argentina, México, Colombia, etc. La app explota
+  3. Conectar GitHub para CI/CD (15 min) — buena práctica, te abre la puerta a colaboración
+  4. Custom domain opcional (10 min) — si tenés uno
+
+  → Resultado: una app pública sólida, completa para fines académicos, con un look pulido. Sin auth, todos usan como anónimos.
+
+  Opción 2 — "Saltar a multi-usuario" (si querés llegar al plan grande)
+
+  ~5-7 horas distribuidas en 2-3 sesiones
+
+  1. Fase 1: Auth (2-3 h) — login + registro con Supabase Auth
+  2. Fase 2: Schema albums (1 h) — tablas + RLS
+  3. Fase 5: Vista usuario simple (2-3 h) — /albumes con sus fotos
+
+  → Te saltás admin y QR. Versión multi-usuario simple. Cada user ve solo sus fotos.
+
+  Opción 3 — "Full plan grande"
+
+  ~14 h en varias sesiones
+
+  Las 5 fases completas: Auth + Schema + Admin + QR + Vista usuario. Lo más ambicioso, lo que originalmente pediste.
+
+  Opción 4 — "Inpainting"
+
+  ~1 h
+
+  Levantar inpainting con Hugging Face Inference API. Feature interesante, pero secundaria.
+
+  ---
+  🎯 Mi elección si fuera vos
+
+  Opción 1. Razones:
+
+  1. La app ya está completa funcionalmente para el caso de uso original ("subir foto, quitar fondo, ponerle plantilla del Mundial").
+  2. El nombre dinámico es el detalle que más impacto visual tiene por menos esfuerzo — convierte cada sticker en algo personal.
+  3. Más plantillas explota el potencial sin código.
+  4. Auth/admin/QR son features de "producto" — útiles si la app va a tener usuarios reales recurrentes. Si es académico/demo, agrega complejidad sin ROI claro.
+
+  ---
+  ¿Por cuál vamos? Si te decidís por la 1, arranco con el nombre dinámico que es lo que más se nota.

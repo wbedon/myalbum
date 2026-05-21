@@ -30,6 +30,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
   const [isMobile, setIsMobile] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
   const [transform, setTransform] = useState<Transform | null>(null)
+  const [playerName, setPlayerName] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const origUrlRef = useRef<string | null>(null)
   const procUrlRef = useRef<string | null>(null)
@@ -171,6 +172,8 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
       if (selectedTemplate) {
         blob = await composeWithTemplate(processedUrl, selectedTemplate.image_url, {
           transform: transform ?? undefined,
+          playerName: playerName.trim() || undefined,
+          nameBand: selectedTemplate.name_band ?? undefined,
         })
       } else {
         blob = processedBlob
@@ -246,6 +249,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
     setProgressPct(0)
     setSelectedTemplate(null)
     setTransform(null)
+    setPlayerName('')
   }, [])
 
   const isProcessing = stage === 'loading' || stage === 'processing'
@@ -434,6 +438,27 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
             selectedId={selectedTemplate?.id ?? null}
             onSelect={setSelectedTemplate}
           />
+
+          {/* Nombre dinámico — solo aparece si la plantilla tiene banda de nombre */}
+          {selectedTemplate?.name_band && (
+            <div className="space-y-1.5">
+              <label
+                htmlFor="player-name"
+                className="block font-display text-sm text-mundial-purple/70 uppercase tracking-[0.15em]"
+              >
+                Tu nombre en el sticker
+              </label>
+              <input
+                id="player-name"
+                type="text"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                placeholder="Ej: VALENCIA"
+                maxLength={20}
+                className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 font-display text-mundial-purple placeholder:text-mundial-purple/30 text-base tracking-wider uppercase focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
+              />
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex flex-wrap gap-3 justify-center pt-1">

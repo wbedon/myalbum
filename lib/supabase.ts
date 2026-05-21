@@ -22,6 +22,20 @@ export type SafeArea = {
   height: number  // alto en fracción
 }
 
+/**
+ * Región de la plantilla donde se superpone el nombre del jugador.
+ * Coordenadas normalizadas (0–1). Configurado por plantilla en Supabase.
+ */
+export type NameBand = {
+  x: number           // fracción 0–1
+  y: number           // fracción 0–1
+  width: number       // fracción 0–1
+  height: number      // fracción 0–1
+  color?: string      // color del texto (default '#FFFFFF')
+  font_size?: number  // fracción del ancho del canvas (default 0.055)
+  uppercase?: boolean // default true
+}
+
 export type Template = {
   id: string
   name: string
@@ -30,6 +44,7 @@ export type Template = {
   is_active: boolean
   created_at: string
   safe_area?: SafeArea
+  name_band?: NameBand
 }
 
 export type Photo = {

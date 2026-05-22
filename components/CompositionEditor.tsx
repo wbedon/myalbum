@@ -153,12 +153,6 @@ export default function CompositionEditor({
   // Altura de la imagen completa como fracción del alto del contenedor
   const heightFraction = (transform.width * templateAspect) / cutoutAspect
 
-  // Área visible (recortada) en espacio de fracción de la plantilla
-  const visLeft   = transform.x + crop.x * transform.width
-  const visTop    = transform.y + crop.y * heightFraction
-  const visWidth  = crop.w * transform.width
-  const visHeight = crop.h * heightFraction
-
   const cropHandles: { id: CropHandle; cls: string; cursor: string; size: string }[] = [
     { id: 'tl', cls: '-top-2.5 -left-2.5',                     cursor: 'cursor-nwse-resize', size: 'w-5 h-5' },
     { id: 'tr', cls: '-top-2.5 -right-2.5',                    cursor: 'cursor-nesw-resize', size: 'w-5 h-5' },
@@ -183,50 +177,84 @@ export default function CompositionEditor({
         draggable={false}
       />
 
-      {/* Contenedor posicionado sin handler: evita bubbling entre drag y crop/resize */}
+      {/* Contenedor del cutout: cubre el tamaño COMPLETO de la imagen (sin recortar).
+          La imagen se ve entera; las zonas fuera del recorte se oscurecen con overlays. */}
       <div
         className="absolute"
         style={{
-          left:   `${visLeft   * 100}%`,
-          top:    `${visTop    * 100}%`,
-          width:  `${visWidth  * 100}%`,
-          height: `${visHeight * 100}%`,
+          left:   `${transform.x * 100}%`,
+          top:    `${transform.y * 100}%`,
+          width:  `${transform.width * 100}%`,
+          height: `${heightFraction * 100}%`,
         }}
       >
-        {/* Área de arrastre: SOLO el interior de la imagen recortada */}
+        {/* Imagen completa al 100% del contenedor */}
+        <img
+          src={cutoutUrl}
+          alt=""
+          className="absolute inset-0 w-full h-full pointer-events-none"
+          draggable={false}
+        />
+
+        {/* Overlays oscuros: zonas FUERA del recorte (4 franjas sin gaps) */}
+        <div className="absolute bg-black/50 pointer-events-none"
+          style={{ left: 0, top: 0, right: 0, height: `${crop.y * 100}%` }} />
+        <div className="absolute bg-black/50 pointer-events-none"
+          style={{ left: 0, top: `${(crop.y + crop.h) * 100}%`, right: 0, bottom: 0 }} />
+        <div className="absolute bg-black/50 pointer-events-none"
+          style={{ left: 0, top: `${crop.y * 100}%`, width: `${crop.x * 100}%`, height: `${crop.h * 100}%` }} />
+        <div className="absolute bg-black/50 pointer-events-none"
+          style={{ left: `${(crop.x + crop.w) * 100}%`, top: `${crop.y * 100}%`, right: 0, height: `${crop.h * 100}%` }} />
+
+        {/* Zona de arrastre: área visible (recortada), sin modificar tamaño de imagen */}
         <div
-          className="absolute inset-0 overflow-hidden border-2 border-dashed border-mundial-green/80 cursor-move touch-none select-none"
+          className="absolute cursor-move touch-none"
+          style={{
+            left:   `${crop.x * 100}%`,
+            top:    `${crop.y * 100}%`,
+            width:  `${crop.w * 100}%`,
+            height: `${crop.h * 100}%`,
+          }}
           onPointerDown={handleDragStart}
+        />
+
+        {/* Borde punteado del área recortada */}
+        <div
+          className="absolute border-2 border-dashed border-mundial-green/80 pointer-events-none"
+          style={{
+            left:   `${crop.x * 100}%`,
+            top:    `${crop.y * 100}%`,
+            width:  `${crop.w * 100}%`,
+            height: `${crop.h * 100}%`,
+          }}
+        />
+
+        {/* Handles de recorte: wrapper pointer-events-none → los handles reciben eventos,
+            el área interior pasa los eventos al div de arrastre que está debajo */}
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            left:   `${crop.x * 100}%`,
+            top:    `${crop.y * 100}%`,
+            width:  `${crop.w * 100}%`,
+            height: `${crop.h * 100}%`,
+          }}
         >
-          <img
-            src={cutoutUrl}
-            alt=""
-            style={{
-              position: 'absolute',
-              width:  `${100 / crop.w}%`,
-              height: `${100 / crop.h}%`,
-              left:   `${-(crop.x / crop.w) * 100}%`,
-              top:    `${-(crop.y / crop.h) * 100}%`,
-            }}
-            draggable={false}
-          />
+          {cropHandles.map(({ id, cls, cursor, size }) => (
+            <div
+              key={id}
+              onPointerDown={(e) => handleCropStart(id, e)}
+              className={`absolute pointer-events-auto ${size} bg-white border-2 border-mundial-green rounded-sm shadow-md z-10 touch-none ${cls} ${cursor}`}
+            />
+          ))}
         </div>
 
-        {/* Handles de recorte: hermanos del área de arrastre, sin bubbling */}
-        {cropHandles.map(({ id, cls, cursor, size }) => (
-          <div
-            key={id}
-            onPointerDown={(e) => handleCropStart(id, e)}
-            className={`absolute ${size} bg-white border-2 border-mundial-green rounded-sm shadow-md z-10 touch-none select-none ${cls} ${cursor}`}
-          />
-        ))}
-
-        {/* Handle de resize: círculo amarillo en esquina inferior derecha */}
+        {/* Círculo de resize: esquina inferior-derecha de la imagen completa */}
         <div
           role="button"
           aria-label="Redimensionar"
           onPointerDown={handleResizeStart}
-          className="absolute -bottom-2.5 -right-2.5 w-6 h-6 bg-mundial-yellow border-2 border-mundial-green rounded-full cursor-nwse-resize shadow-md z-10 touch-none select-none hover:scale-110 transition-transform"
+          className="absolute -bottom-2.5 -right-2.5 w-6 h-6 bg-mundial-yellow border-2 border-mundial-green rounded-full cursor-nwse-resize shadow-md z-10 touch-none hover:scale-110 transition-transform"
         />
       </div>
 

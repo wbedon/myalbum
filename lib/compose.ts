@@ -24,9 +24,17 @@ export type Transform = {
   width: number   // ancho del cutout (fracción 0–1, puede pasarse de 1 si se quiere agrandar)
 }
 
+export type CropBox = {
+  x: number  // fracción del ancho de la imagen (0–1)
+  y: number  // fracción del alto de la imagen  (0–1)
+  w: number  // fracción del ancho
+  h: number  // fracción del alto
+}
+
 export type ComposeOptions = {
   safeArea?: SafeArea | null
   transform?: Transform | null
+  crop?: CropBox | null
   playerName?: string | null
   nameBand?: NameBand | null
 }
@@ -56,7 +64,7 @@ export async function composeWithTemplate(
   let ctx: CanvasRenderingContext2D
 
   if (options?.transform) {
-    ;({ canvas, ctx } = buildWithTransform(cutout, template, options.transform))
+    ;({ canvas, ctx } = buildWithTransform(cutout, template, options.transform, options.crop))
   } else if (options?.safeArea) {
     ;({ canvas, ctx } = buildWithSafeArea(cutout, template, options.safeArea))
   } else {
@@ -78,7 +86,8 @@ export async function composeWithTemplate(
 function buildWithTransform(
   cutout: HTMLImageElement,
   template: HTMLImageElement,
-  t: Transform
+  t: Transform,
+  crop?: CropBox | null
 ): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
   const tW = template.naturalWidth
   const tH = template.naturalHeight
@@ -91,9 +100,20 @@ function buildWithTransform(
 
   ctx.drawImage(template, 0, 0)
 
-  const drawW = t.width * tW
-  const drawH = drawW * (cutout.naturalHeight / cutout.naturalWidth)
-  ctx.drawImage(cutout, t.x * tW, t.y * tH, drawW, drawH)
+  const fullDrawW = t.width * tW
+  const fullDrawH = fullDrawW * (cutout.naturalHeight / cutout.naturalWidth)
+
+  if (crop && (crop.x > 0 || crop.y > 0 || crop.w < 1 || crop.h < 1)) {
+    const sx = crop.x * cutout.naturalWidth
+    const sy = crop.y * cutout.naturalHeight
+    const sw = crop.w * cutout.naturalWidth
+    const sh = crop.h * cutout.naturalHeight
+    const dx = t.x * tW + crop.x * fullDrawW
+    const dy = t.y * tH + crop.y * fullDrawH
+    ctx.drawImage(cutout, sx, sy, sw, sh, dx, dy, crop.w * fullDrawW, crop.h * fullDrawH)
+  } else {
+    ctx.drawImage(cutout, t.x * tW, t.y * tH, fullDrawW, fullDrawH)
+  }
 
   return { canvas, ctx }
 }

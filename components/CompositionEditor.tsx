@@ -183,21 +183,21 @@ export default function CompositionEditor({
         draggable={false}
       />
 
-      {/* Cutout: div externo es el target de arrastre y contiene los handles.
-          Sin overflow:hidden para que los handles sobresalgan.
-          El div interno recorta la imagen al área visible. */}
+      {/* Contenedor posicionado sin handler: evita bubbling entre drag y crop/resize */}
       <div
-        className="absolute cursor-move"
+        className="absolute"
         style={{
           left:   `${visLeft   * 100}%`,
           top:    `${visTop    * 100}%`,
           width:  `${visWidth  * 100}%`,
           height: `${visHeight * 100}%`,
         }}
-        onPointerDown={handleDragStart}
       >
-        {/* Div interno: recorta la imagen y muestra el borde punteado */}
-        <div className="absolute inset-0 overflow-hidden border-2 border-dashed border-mundial-green/80">
+        {/* Área de arrastre: SOLO el interior de la imagen recortada */}
+        <div
+          className="absolute inset-0 overflow-hidden border-2 border-dashed border-mundial-green/80 cursor-move touch-none select-none"
+          onPointerDown={handleDragStart}
+        >
           <img
             src={cutoutUrl}
             alt=""
@@ -212,12 +212,12 @@ export default function CompositionEditor({
           />
         </div>
 
-        {/* Handles de recorte (7 handles: 3 esquinas + 4 bordes) */}
+        {/* Handles de recorte: hermanos del área de arrastre, sin bubbling */}
         {cropHandles.map(({ id, cls, cursor, size }) => (
           <div
             key={id}
             onPointerDown={(e) => handleCropStart(id, e)}
-            className={`absolute ${size} bg-white border-2 border-mundial-green rounded-sm shadow-md z-10 ${cls} ${cursor}`}
+            className={`absolute ${size} bg-white border-2 border-mundial-green rounded-sm shadow-md z-10 touch-none select-none ${cls} ${cursor}`}
           />
         ))}
 
@@ -226,7 +226,7 @@ export default function CompositionEditor({
           role="button"
           aria-label="Redimensionar"
           onPointerDown={handleResizeStart}
-          className="absolute -bottom-2.5 -right-2.5 w-6 h-6 bg-mundial-yellow border-2 border-mundial-green rounded-full cursor-nwse-resize shadow-md z-10 hover:scale-110 transition-transform"
+          className="absolute -bottom-2.5 -right-2.5 w-6 h-6 bg-mundial-yellow border-2 border-mundial-green rounded-full cursor-nwse-resize shadow-md z-10 touch-none select-none hover:scale-110 transition-transform"
         />
       </div>
 

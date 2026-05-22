@@ -5,6 +5,7 @@ import { supabase, isSupabaseConfigured, type Template } from '@/lib/supabase'
 import { composeWithTemplate, type Transform } from '@/lib/compose'
 import TemplatePicker from './TemplatePicker'
 import CompositionEditor from './CompositionEditor'
+import CropEditor from './CropEditor'
 
 // TODO(inpainting): modo "Fondo sin persona". Intentado con inpaint-web (no
 // existe en npm). Plan B abierto: Hugging Face Inference API vía API route
@@ -31,15 +32,19 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
   const [transform, setTransform] = useState<Transform | null>(null)
   const [playerName, setPlayerName] = useState<string>('')
+  const [showCrop, setShowCrop] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const origUrlRef = useRef<string | null>(null)
   const procUrlRef = useRef<string | null>(null)
+  const origCutoutUrlRef = useRef<string | null>(null)
+  const croppedUrlRef = useRef<string | null>(null)
 
   useEffect(() => {
     setIsMobile(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent))
     return () => {
       if (origUrlRef.current) URL.revokeObjectURL(origUrlRef.current)
       if (procUrlRef.current) URL.revokeObjectURL(procUrlRef.current)
+      if (croppedUrlRef.current) URL.revokeObjectURL(croppedUrlRef.current)
     }
   }, [])
 
@@ -131,6 +136,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
 
       const resultUrl = URL.createObjectURL(result)
       procUrlRef.current = resultUrl
+      origCutoutUrlRef.current = resultUrl
       setProcessedBlob(result)
       setProcessedUrl(resultUrl)
       setProgressPct(100)
@@ -161,6 +167,15 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
     },
     [processFile]
   )
+
+  const handleCropConfirm = useCallback((blob: Blob) => {
+    if (croppedUrlRef.current) URL.revokeObjectURL(croppedUrlRef.current)
+    const url = URL.createObjectURL(blob)
+    croppedUrlRef.current = url
+    setProcessedBlob(blob)
+    setProcessedUrl(url)
+    setShowCrop(false)
+  }, [])
 
   const [isDownloading, setIsDownloading] = useState(false)
 
@@ -250,6 +265,9 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
     setSelectedTemplate(null)
     setTransform(null)
     setPlayerName('')
+    setShowCrop(false)
+    if (croppedUrlRef.current) { URL.revokeObjectURL(croppedUrlRef.current); croppedUrlRef.current = null }
+    origCutoutUrlRef.current = null
   }, [])
 
   const isProcessing = stage === 'loading' || stage === 'processing'
@@ -529,6 +547,16 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
             )}
 
             <button
+              onClick={() => setShowCrop(true)}
+              className="inline-flex items-center gap-2 px-6 py-3.5 text-mundial-purple font-display text-base tracking-wider uppercase rounded-xl border-2 border-mundial-purple/20 hover:border-mundial-purple/50 hover:bg-mundial-purple/5 transition-colors"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 2v14a2 2 0 002 2h14M2 6h14a2 2 0 012 2v14" />
+              </svg>
+              Recortar foto
+            </button>
+
+            <button
               onClick={handleReset}
               className="px-6 py-3 text-mundial-purple/60 hover:text-mundial-purple font-display text-base tracking-wider uppercase rounded-xl hover:bg-mundial-purple/5 transition-colors"
             >
@@ -536,6 +564,13 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
             </button>
           </div>
         </div>
+      )}
+      {showCrop && origCutoutUrlRef.current && (
+        <CropEditor
+          imageUrl={origCutoutUrlRef.current}
+          onConfirm={handleCropConfirm}
+          onCancel={() => setShowCrop(false)}
+        />
       )}
     </div>
   )

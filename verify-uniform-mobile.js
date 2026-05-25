@@ -17,6 +17,8 @@ const TIMEOUT = 360_000
   console.log('AI listo')
 
   // ── Test 1: sin plantilla, el UniformPicker NO debe aparecer ──
+  // Esperar que el TemplatePicker cargue (pasa de skeleton a <select>)
+  await page.locator('select').first().waitFor({ state: 'visible', timeout: 10000 })
   const selectsBeforeTemplate = await page.locator('select').count()
   console.log(`\n── Sin plantilla ──`)
   console.log(`  Selects visibles: ${selectsBeforeTemplate} (esperado: 1 — solo template picker)`)

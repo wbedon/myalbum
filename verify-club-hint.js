@@ -3,10 +3,12 @@
  * 1. El nombre del club aparece en el óvalo inferior del sticker
  * 2. El nombre del jugador sigue en el óvalo superior
  * 3. El hint "Arrastrá para mover..." está FUERA/DEBAJO del editor (no lo tapa)
+ * 4. El uniforme se incluye en el PNG descargado
  */
 
 const { chromium, devices } = require('playwright')
 const path = require('path')
+const fs = require('fs')
 
 const URL = 'https://myalbum-green.vercel.app'
 const IPHONE = devices['iPhone 13']
@@ -24,8 +26,10 @@ const TIMEOUT = 360_000
   await page.locator('button').filter({ hasText: 'Descargar PNG' }).waitFor({ state: 'visible', timeout: TIMEOUT })
   console.log('AI listo')
 
-  await page.locator('button[title="Ecuador"]').scrollIntoViewIfNeeded()
-  await page.locator('button[title="Ecuador"]').tap()
+  await page.locator('select').first().waitFor({ state: 'visible' })
+  const tplVal = await page.locator('select').first()
+    .locator('option').filter({ hasText: 'Ecuador' }).getAttribute('value')
+  await page.locator('select').first().selectOption({ value: tplVal ?? '' })
   await page.waitForTimeout(1800)
 
   const editor = page.locator('[style*="aspect-ratio"]').first()
@@ -71,6 +75,13 @@ const TIMEOUT = 360_000
   await page.locator('input#club-name').fill('BARCELONA SC')
   await page.waitForTimeout(700)
 
+  // ── Seleccionar uniforme ──
+  await page.locator('select').nth(1).waitFor({ state: 'visible' })
+  const uniVal = await page.locator('select').nth(1)
+    .locator('option').filter({ hasText: 'Ecuador' }).getAttribute('value')
+  await page.locator('select').nth(1).selectOption({ value: uniVal ?? '' })
+  await page.waitForTimeout(800)
+
   await editor.scrollIntoViewIfNeeded()
   await page.waitForTimeout(400)
   await editor.screenshot({ path: 'club-02-con-nombres.png' })
@@ -100,11 +111,25 @@ const TIMEOUT = 360_000
   // ── Screenshot página completa para ver hint debajo ──
   await page.screenshot({ path: 'club-03-pagina-full.png' })
 
+  // ── Test 4: uniforme en el PNG descargado ──
+  const uniformLayerExists = await editor.locator('img').count().then(n => n >= 3)
+  console.log(`\n── Uniforme ──`)
+  console.log(`  ${uniformLayerExists ? '✅' : '❌'} Capa de uniforme en el editor (≥3 imágenes)`)
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.locator('button').filter({ hasText: 'Descargar PNG' }).tap(),
+  ])
+  await download.saveAs('club-04-descargado.png')
+  const kb = Math.round(fs.statSync('club-04-descargado.png').size / 1024)
+  console.log(`  PNG descargado: ${kb} KB`)
+  console.log(`  ${kb > 50 ? '✅' : '❌'} PNG no vacío`)
+
   const allPass = hintInEditor.hintExists && !hintInEditor.hintInsideEditor
-    && clubInputVisible && hasPlayerName && hasClubName
+    && clubInputVisible && hasPlayerName && hasClubName && uniformLayerExists && kb > 50
   console.log(`\n${'─'.repeat(40)}`)
   console.log(`Veredicto: ${allPass ? '✅ PASS' : '❌ FAIL'}`)
-  console.log('Screenshots: club-01, club-02, club-03')
+  console.log('Screenshots: club-01, club-02, club-03, club-04 (PNG final)')
 
   await browser.close()
   if (!allPass) process.exit(1)

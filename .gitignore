@@ -26,4 +26,8 @@ next-env.d.ts
 *.png
 verify-screenshots/
 
+# excepciones: assets del proyecto
+!public/**/*.png
+!public/**/*.jpg
+
 .vercel

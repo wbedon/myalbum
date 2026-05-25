@@ -203,7 +203,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
     } finally {
       setIsDownloading(false)
     }
-  }, [processedBlob, processedUrl, selectedTemplate, transform, crop, playerName])
+  }, [processedBlob, processedUrl, selectedTemplate, transform, crop, playerName, clubName, selectedUniform])
 
   const handleSave = useCallback(async () => {
     if (!processedBlob) return

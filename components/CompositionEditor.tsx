@@ -17,6 +17,7 @@ interface Props {
   nameBand?: NameBand | null
   clubName?: string
   clubBand?: NameBand | null
+  uniformUrl?: string
 }
 
 const MIN_CROP = 0.04
@@ -32,6 +33,7 @@ export default function CompositionEditor({
   nameBand,
   clubName,
   clubBand,
+  uniformUrl,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [tplDims, setTplDims] = useState<{ w: number; h: number } | null>(null)
@@ -185,6 +187,26 @@ export default function CompositionEditor({
         className="absolute inset-0 w-full h-full object-contain pointer-events-none"
         draggable={false}
       />
+
+      {/* Capa de uniforme: detrás del cutout, misma posición/ancho que el transform */}
+      {uniformUrl && (
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            left:  `${transform.x * 100}%`,
+            top:   `${transform.y * 100}%`,
+            width: `${transform.width * 100}%`,
+          }}
+        >
+          <img
+            src={uniformUrl}
+            alt=""
+            className="w-full"
+            draggable={false}
+            crossOrigin="anonymous"
+          />
+        </div>
+      )}
 
       {/* Contenedor del cutout: cubre el tamaño COMPLETO de la imagen (sin recortar).
           La imagen se ve entera; las zonas fuera del recorte se oscurecen con overlays. */}

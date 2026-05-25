@@ -39,6 +39,7 @@ export type ComposeOptions = {
   nameBand?: NameBand | null
   clubName?: string | null
   clubBand?: NameBand | null
+  uniformUrl?: string | null
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -61,12 +62,13 @@ export async function composeWithTemplate(
   if (!templateUrl) return blobFromImage(cutout)
 
   const template = await loadImage(templateUrl)
+  const uniform = options?.uniformUrl ? await loadImage(options.uniformUrl) : null
 
   let canvas: HTMLCanvasElement
   let ctx: CanvasRenderingContext2D
 
   if (options?.transform) {
-    ;({ canvas, ctx } = buildWithTransform(cutout, template, options.transform, options.crop))
+    ;({ canvas, ctx } = buildWithTransform(cutout, template, options.transform, options.crop, uniform))
   } else if (options?.safeArea) {
     ;({ canvas, ctx } = buildWithSafeArea(cutout, template, options.safeArea))
   } else {
@@ -92,7 +94,8 @@ function buildWithTransform(
   cutout: HTMLImageElement,
   template: HTMLImageElement,
   t: Transform,
-  crop?: CropBox | null
+  crop?: CropBox | null,
+  uniform?: HTMLImageElement | null
 ): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
   const tW = template.naturalWidth
   const tH = template.naturalHeight
@@ -104,6 +107,12 @@ function buildWithTransform(
   if (!ctx) throw new Error('Canvas 2D no disponible')
 
   ctx.drawImage(template, 0, 0)
+
+  if (uniform) {
+    const uDrawW = t.width * tW
+    const uDrawH = uDrawW * (uniform.naturalHeight / uniform.naturalWidth)
+    ctx.drawImage(uniform, t.x * tW, t.y * tH, uDrawW, uDrawH)
+  }
 
   const fullDrawW = t.width * tW
   const fullDrawH = fullDrawW * (cutout.naturalHeight / cutout.naturalWidth)

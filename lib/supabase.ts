@@ -48,6 +48,15 @@ export type Template = {
   club_band?: NameBand
 }
 
+export type Uniform = {
+  id: string
+  name: string
+  image_url: string
+  sort_order: number
+  is_active: boolean
+  created_at: string
+}
+
 export type Photo = {
   id: string
   processed_url: string

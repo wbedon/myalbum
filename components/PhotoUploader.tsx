@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { supabase, isSupabaseConfigured, type Template } from '@/lib/supabase'
+import { supabase, isSupabaseConfigured, type Template, type Uniform } from '@/lib/supabase'
 import { composeWithTemplate, type Transform, type CropBox } from '@/lib/compose'
 import TemplatePicker from './TemplatePicker'
+import UniformPicker from './UniformPicker'
 import CompositionEditor from './CompositionEditor'
 
 // TODO(inpainting): modo "Fondo sin persona". Intentado con inpaint-web (no
@@ -29,6 +30,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
   const [savedOk, setSavedOk] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
+  const [selectedUniform, setSelectedUniform] = useState<Uniform | null>(null)
   const [transform, setTransform] = useState<Transform | null>(null)
   const [crop, setCrop] = useState<CropBox>({ x: 0, y: 0, w: 1, h: 1 })
   const [playerName, setPlayerName] = useState<string>('')
@@ -181,6 +183,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
           nameBand: selectedTemplate.name_band ?? undefined,
           clubName: clubName.trim() || undefined,
           clubBand: selectedTemplate.club_band ?? undefined,
+          uniformUrl: selectedUniform?.image_url ?? undefined,
         })
       } else {
         blob = processedBlob
@@ -255,6 +258,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
     setSavedOk(false)
     setProgressPct(0)
     setSelectedTemplate(null)
+    setSelectedUniform(null)
     setTransform(null)
     setCrop({ x: 0, y: 0, w: 1, h: 1 })
     setPlayerName('')
@@ -436,6 +440,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
                     nameBand={selectedTemplate.name_band}
                     clubName={clubName}
                     clubBand={selectedTemplate.club_band}
+                    uniformUrl={selectedUniform?.image_url}
                   />
                   <div className="mt-1.5 text-[10px] font-semibold text-mundial-purple/60 text-center">
                     Arrastrá para mover · handles blancos para recortar · círculo amarillo para redimensionar
@@ -458,6 +463,14 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
             selectedId={selectedTemplate?.id ?? null}
             onSelect={setSelectedTemplate}
           />
+
+          {/* Uniform picker — solo cuando hay plantilla seleccionada */}
+          {selectedTemplate && (
+            <UniformPicker
+              selectedId={selectedUniform?.id ?? null}
+              onSelect={setSelectedUniform}
+            />
+          )}
 
           {/* Campos de nombre — solo aparecen si la plantilla tiene bandas */}
           {(selectedTemplate?.name_band || selectedTemplate?.club_band) && (

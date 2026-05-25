@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { Transform, CropBox } from '@/lib/compose'
+import type { NameBand } from '@/lib/supabase'
 
 type CropHandle = 'tl' | 'tr' | 'bl' | 't' | 'b' | 'l' | 'r'
 
@@ -12,6 +13,8 @@ interface Props {
   onTransformChange: (t: Transform) => void
   crop: CropBox
   onCropChange: (c: CropBox) => void
+  playerName?: string
+  nameBand?: NameBand | null
 }
 
 const MIN_CROP = 0.04
@@ -23,10 +26,21 @@ export default function CompositionEditor({
   onTransformChange,
   crop,
   onCropChange,
+  playerName,
+  nameBand,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [tplDims, setTplDims] = useState<{ w: number; h: number } | null>(null)
   const [cutDims, setCutDims] = useState<{ w: number; h: number } | null>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(entries => setContainerWidth(entries[0].contentRect.width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   useEffect(() => {
     const img = new Image()
@@ -257,6 +271,41 @@ export default function CompositionEditor({
           className="absolute -bottom-2.5 -right-2.5 w-6 h-6 bg-mundial-yellow border-2 border-mundial-green rounded-full cursor-nwse-resize shadow-md z-10 touch-none hover:scale-110 transition-transform"
         />
       </div>
+
+      {/* Preview del nombre: se muestra en tiempo real mientras el usuario escribe */}
+      {playerName && nameBand && containerWidth > 0 && (
+        <div
+          className="absolute pointer-events-none z-20"
+          style={{
+            left:   `${nameBand.x * 100}%`,
+            top:    `${nameBand.y * 100}%`,
+            width:  `${nameBand.width * 100}%`,
+            height: `${nameBand.height * 100}%`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <span
+            style={{
+              fontFamily: 'Anton, Impact, sans-serif',
+              fontSize: `${nameBand.font_size * containerWidth}px`,
+              color: nameBand.color ?? '#FFFFFF',
+              textTransform: (nameBand.uppercase ?? true) ? 'uppercase' : 'none',
+              fontWeight: 'bold',
+              textAlign: 'center',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              maxWidth: '100%',
+              letterSpacing: '0.02em',
+              textShadow: '0 1px 3px rgba(0,0,0,0.4)',
+            }}
+          >
+            {(nameBand.uppercase ?? true) ? playerName.toUpperCase() : playerName}
+          </span>
+        </div>
+      )}
 
       {/* Ayuda contextual */}
       <div className="absolute bottom-2 left-2 right-2 pointer-events-none">

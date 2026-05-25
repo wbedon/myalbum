@@ -427,6 +427,8 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
                   onTransformChange={setTransform}
                   crop={crop}
                   onCropChange={setCrop}
+                  playerName={playerName}
+                  nameBand={selectedTemplate.name_band}
                 />
               ) : (
                 <div className="rounded-2xl overflow-hidden border-2 border-mundial-purple/10 bg-checkerboard aspect-square">

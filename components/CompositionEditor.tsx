@@ -40,7 +40,7 @@ export default function CompositionEditor({
     const ro = new ResizeObserver(entries => setContainerWidth(entries[0].contentRect.width))
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [tplDims, cutDims])
 
   useEffect(() => {
     const img = new Image()

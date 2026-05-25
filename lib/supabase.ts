@@ -45,6 +45,7 @@ export type Template = {
   created_at: string
   safe_area?: SafeArea
   name_band?: NameBand
+  club_band?: NameBand
 }
 
 export type Photo = {

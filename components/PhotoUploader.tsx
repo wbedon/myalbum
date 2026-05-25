@@ -32,6 +32,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
   const [transform, setTransform] = useState<Transform | null>(null)
   const [crop, setCrop] = useState<CropBox>({ x: 0, y: 0, w: 1, h: 1 })
   const [playerName, setPlayerName] = useState<string>('')
+  const [clubName, setClubName] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const origUrlRef = useRef<string | null>(null)
   const procUrlRef = useRef<string | null>(null)
@@ -178,6 +179,8 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
           crop,
           playerName: playerName.trim() || undefined,
           nameBand: selectedTemplate.name_band ?? undefined,
+          clubName: clubName.trim() || undefined,
+          clubBand: selectedTemplate.club_band ?? undefined,
         })
       } else {
         blob = processedBlob
@@ -255,6 +258,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
     setTransform(null)
     setCrop({ x: 0, y: 0, w: 1, h: 1 })
     setPlayerName('')
+    setClubName('')
   }, [])
 
   const isProcessing = stage === 'loading' || stage === 'processing'
@@ -420,16 +424,23 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
                 {selectedTemplate ? `Con: ${selectedTemplate.name}` : 'Sin fondo'}
               </p>
               {selectedTemplate && transform && processedUrl ? (
-                <CompositionEditor
-                  templateUrl={selectedTemplate.image_url}
-                  cutoutUrl={processedUrl}
-                  transform={transform}
-                  onTransformChange={setTransform}
-                  crop={crop}
-                  onCropChange={setCrop}
-                  playerName={playerName}
-                  nameBand={selectedTemplate.name_band}
-                />
+                <>
+                  <CompositionEditor
+                    templateUrl={selectedTemplate.image_url}
+                    cutoutUrl={processedUrl}
+                    transform={transform}
+                    onTransformChange={setTransform}
+                    crop={crop}
+                    onCropChange={setCrop}
+                    playerName={playerName}
+                    nameBand={selectedTemplate.name_band}
+                    clubName={clubName}
+                    clubBand={selectedTemplate.club_band}
+                  />
+                  <div className="mt-1.5 text-[10px] font-semibold text-mundial-purple/60 text-center">
+                    Arrastrá para mover · handles blancos para recortar · círculo amarillo para redimensionar
+                  </div>
+                </>
               ) : (
                 <div className="rounded-2xl overflow-hidden border-2 border-mundial-purple/10 bg-checkerboard aspect-square">
                   <img
@@ -448,24 +459,47 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
             onSelect={setSelectedTemplate}
           />
 
-          {/* Nombre dinámico — solo aparece si la plantilla tiene banda de nombre */}
-          {selectedTemplate?.name_band && (
-            <div className="space-y-1.5">
-              <label
-                htmlFor="player-name"
-                className="block font-display text-sm text-mundial-purple/70 uppercase tracking-[0.15em]"
-              >
-                Tu nombre en el sticker
-              </label>
-              <input
-                id="player-name"
-                type="text"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                placeholder="Ej: VALENCIA"
-                maxLength={20}
-                className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 font-display text-mundial-purple placeholder:text-mundial-purple/30 text-base tracking-wider uppercase focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
-              />
+          {/* Campos de nombre — solo aparecen si la plantilla tiene bandas */}
+          {(selectedTemplate?.name_band || selectedTemplate?.club_band) && (
+            <div className="space-y-3">
+              {selectedTemplate?.name_band && (
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="player-name"
+                    className="block font-display text-sm text-mundial-purple/70 uppercase tracking-[0.15em]"
+                  >
+                    Tu nombre en el sticker
+                  </label>
+                  <input
+                    id="player-name"
+                    type="text"
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    placeholder="Ej: VALENCIA"
+                    maxLength={20}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 font-display text-mundial-purple placeholder:text-mundial-purple/30 text-base tracking-wider uppercase focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
+                  />
+                </div>
+              )}
+              {selectedTemplate?.club_band && (
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="club-name"
+                    className="block font-display text-sm text-mundial-purple/70 uppercase tracking-[0.15em]"
+                  >
+                    Tu club
+                  </label>
+                  <input
+                    id="club-name"
+                    type="text"
+                    value={clubName}
+                    onChange={(e) => setClubName(e.target.value)}
+                    placeholder="Ej: BOCA JUNIORS"
+                    maxLength={25}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 font-display text-mundial-purple placeholder:text-mundial-purple/30 text-base tracking-wider uppercase focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
+                  />
+                </div>
+              )}
             </div>
           )}
 

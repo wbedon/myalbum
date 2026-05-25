@@ -15,6 +15,8 @@ interface Props {
   onCropChange: (c: CropBox) => void
   playerName?: string
   nameBand?: NameBand | null
+  clubName?: string
+  clubBand?: NameBand | null
 }
 
 const MIN_CROP = 0.04
@@ -28,6 +30,8 @@ export default function CompositionEditor({
   onCropChange,
   playerName,
   nameBand,
+  clubName,
+  clubBand,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [tplDims, setTplDims] = useState<{ w: number; h: number } | null>(null)
@@ -263,7 +267,7 @@ export default function CompositionEditor({
         />
       </div>
 
-      {/* Preview del nombre: se muestra en tiempo real mientras el usuario escribe */}
+      {/* Preview nombre jugador */}
       {playerName && nameBand && (
         <div
           className="absolute pointer-events-none z-20"
@@ -277,37 +281,52 @@ export default function CompositionEditor({
             justifyContent: 'center',
           }}
         >
-          <span
-            style={{
-              fontFamily: 'Anton, Impact, sans-serif',
-              fontSize: `${(nameBand.font_size ?? 0.055) * 100}cqw`,
-              color: nameBand.color ?? '#FFFFFF',
-              textTransform: (nameBand.uppercase ?? true) ? 'uppercase' : 'none',
-              fontWeight: 'bold',
-              textAlign: 'center',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              maxWidth: '100%',
-              letterSpacing: '0.02em',
-              textShadow: '0 1px 3px rgba(0,0,0,0.4)',
-            }}
-          >
+          <span style={bandTextStyle(nameBand)}>
             {(nameBand.uppercase ?? true) ? playerName.toUpperCase() : playerName}
           </span>
         </div>
       )}
 
-      {/* Ayuda contextual */}
-      <div className="absolute bottom-2 left-2 right-2 pointer-events-none">
-        <div className="inline-block text-[10px] font-semibold text-mundial-purple bg-mundial-yellow/90 px-2 py-1 rounded shadow-sm">
-          Arrastrá para mover · handles blancos para recortar · círculo amarillo para redimensionar
+      {/* Preview nombre club */}
+      {clubName && clubBand && (
+        <div
+          className="absolute pointer-events-none z-20"
+          style={{
+            left:   `${clubBand.x * 100}%`,
+            top:    `${clubBand.y * 100}%`,
+            width:  `${clubBand.width * 100}%`,
+            height: `${clubBand.height * 100}%`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <span style={bandTextStyle(clubBand)}>
+            {(clubBand.uppercase ?? true) ? clubName.toUpperCase() : clubName}
+          </span>
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
 function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v))
+}
+
+function bandTextStyle(band: import('@/lib/supabase').NameBand): React.CSSProperties {
+  return {
+    fontFamily: 'Anton, Impact, sans-serif',
+    fontSize: `${(band.font_size ?? 0.055) * 100}cqw`,
+    color: band.color ?? '#FFFFFF',
+    textTransform: (band.uppercase ?? true) ? 'uppercase' : 'none',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: '100%',
+    letterSpacing: '0.02em',
+    textShadow: '0 1px 3px rgba(0,0,0,0.4)',
+  }
 }

@@ -37,6 +37,8 @@ export type ComposeOptions = {
   crop?: CropBox | null
   playerName?: string | null
   nameBand?: NameBand | null
+  clubName?: string | null
+  clubBand?: NameBand | null
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -73,6 +75,9 @@ export async function composeWithTemplate(
 
   if (options?.playerName && options?.nameBand) {
     await overlayPlayerName(ctx, options.playerName, options.nameBand, canvas.width, canvas.height)
+  }
+  if (options?.clubName && options?.clubBand) {
+    await overlayPlayerName(ctx, options.clubName, options.clubBand, canvas.width, canvas.height)
   }
 
   return canvasToBlob(canvas)

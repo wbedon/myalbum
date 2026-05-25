@@ -32,15 +32,6 @@ export default function CompositionEditor({
   const containerRef = useRef<HTMLDivElement>(null)
   const [tplDims, setTplDims] = useState<{ w: number; h: number } | null>(null)
   const [cutDims, setCutDims] = useState<{ w: number; h: number } | null>(null)
-  const [containerWidth, setContainerWidth] = useState(0)
-
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const ro = new ResizeObserver(entries => setContainerWidth(entries[0].contentRect.width))
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [tplDims, cutDims])
 
   useEffect(() => {
     const img = new Image()
@@ -181,7 +172,7 @@ export default function CompositionEditor({
     <div
       ref={containerRef}
       className="relative bg-mundial-cream rounded-2xl overflow-hidden select-none touch-none border-2 border-mundial-purple/10"
-      style={{ aspectRatio: `${tplDims.w} / ${tplDims.h}` }}
+      style={{ aspectRatio: `${tplDims.w} / ${tplDims.h}`, containerType: 'inline-size' } as React.CSSProperties}
     >
       {/* Plantilla de fondo */}
       <img
@@ -273,7 +264,7 @@ export default function CompositionEditor({
       </div>
 
       {/* Preview del nombre: se muestra en tiempo real mientras el usuario escribe */}
-      {playerName && nameBand && containerWidth > 0 && (
+      {playerName && nameBand && (
         <div
           className="absolute pointer-events-none z-20"
           style={{
@@ -289,7 +280,7 @@ export default function CompositionEditor({
           <span
             style={{
               fontFamily: 'Anton, Impact, sans-serif',
-              fontSize: `${nameBand.font_size * containerWidth}px`,
+              fontSize: `${nameBand.font_size * 100}cqw`,
               color: nameBand.color ?? '#FFFFFF',
               textTransform: (nameBand.uppercase ?? true) ? 'uppercase' : 'none',
               fontWeight: 'bold',

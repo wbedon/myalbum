@@ -3,9 +3,6 @@
 import { useState, useEffect } from 'react'
 import { supabase, isSupabaseConfigured, type Template } from '@/lib/supabase'
 
-// Plantillas de demostración para cuando Supabase aún no está configurado.
-// Mezcla colores sólidos (placehold.co), imágenes (picsum.photos) y SVG local
-// para mostrar que la misma estructura soporta los tres casos sin código distinto.
 const MOCK_TEMPLATES: Template[] = [
   {
     id: 'mock-figura',
@@ -14,8 +11,6 @@ const MOCK_TEMPLATES: Template[] = [
     sort_order: 0,
     is_active: true,
     created_at: '',
-    // Galíndez en la imagen ocupa aprox. estas coordenadas normalizadas:
-    // queda por encima de la banda morada del nombre y dentro del marco.
     safe_area: { x: 0.20, y: 0.05, width: 0.60, height: 0.78 },
   },
   {
@@ -34,40 +29,27 @@ const MOCK_TEMPLATES: Template[] = [
     is_active: true,
     created_at: '',
   },
-  {
-    id: 'mock-gray',
-    name: 'Gris neutro',
-    image_url: 'https://placehold.co/600x800/64748b/64748b.jpg?text=+',
-    sort_order: 3,
-    is_active: true,
-    created_at: '',
-  },
-  // Plantillas tipo imagen (picsum.photos: imágenes aleatorias estables por seed)
-  {
-    id: 'mock-img-1',
-    name: 'Naturaleza',
-    image_url: 'https://picsum.photos/seed/naturaleza/600/800',
-    sort_order: 4,
-    is_active: true,
-    created_at: '',
-  },
-  {
-    id: 'mock-img-2',
-    name: 'Estudio',
-    image_url: 'https://picsum.photos/seed/estudio/600/800',
-    sort_order: 5,
-    is_active: true,
-    created_at: '',
-  },
-  {
-    id: 'mock-img-3',
-    name: 'Oficina',
-    image_url: 'https://picsum.photos/seed/oficina/600/800',
-    sort_order: 6,
-    is_active: true,
-    created_at: '',
-  },
 ]
+
+const FLAG_MAP: Record<string, string> = {
+  'Argentina':  '🇦🇷',
+  'Brasil':     '🇧🇷',
+  'Colombia':   '🇨🇴',
+  'Ecuador':    '🇪🇨',
+  'Venezuela':  '🇻🇪',
+  'Uruguay':    '🇺🇾',
+  'Chile':      '🇨🇱',
+  'Peru':       '🇵🇪',
+  'Bolivia':    '🇧🇴',
+  'Paraguay':   '🇵🇾',
+  'México':     '🇲🇽',
+  'USA':        '🇺🇸',
+  'Canadá':     '🇨🇦',
+}
+
+function flagFor(name: string): string {
+  return FLAG_MAP[name] ?? '🌐'
+}
 
 interface Props {
   selectedId: string | null
@@ -109,6 +91,15 @@ export default function TemplatePicker({ selectedId, onSelect }: Props) {
     fetchTemplates()
   }, [])
 
+  function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const value = e.target.value
+    if (value === '') {
+      onSelect(null)
+    } else {
+      onSelect(templates.find((t) => t.id === value) ?? null)
+    }
+  }
+
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">
@@ -122,58 +113,43 @@ export default function TemplatePicker({ selectedId, onSelect }: Props) {
         )}
       </div>
 
-      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-        {/* Opción "Sin fondo" (transparente) */}
-        <button
-          type="button"
-          onClick={() => onSelect(null)}
-          title="Sin fondo"
-          className={[
-            'aspect-[3/4] rounded-lg border-2 bg-checkerboard transition-all overflow-hidden relative',
-            'flex items-center justify-center',
-            selectedId === null
-              ? 'border-mundial-green ring-2 ring-mundial-green/30'
-              : 'border-mundial-purple/15 hover:border-mundial-green/50',
-          ].join(' ')}
-        >
-          <span className="text-[10px] text-slate-500 font-medium bg-white/80 px-1.5 py-0.5 rounded">
-            Sin fondo
-          </span>
-        </button>
-
-        {loading
-          ? Array.from({ length: 5 }).map((_, i) => (
-              <div
-                key={i}
-                className="aspect-[3/4] rounded-lg bg-slate-100 animate-pulse"
-              />
-            ))
-          : templates.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => onSelect(t)}
-                title={t.name}
-                className={[
-                  'aspect-[3/4] rounded-lg overflow-hidden border-2 transition-all relative',
-                  selectedId === t.id
-                    ? 'border-mundial-green ring-2 ring-mundial-green/30'
-                    : 'border-mundial-purple/15 hover:border-mundial-green/50',
-                ].join(' ')}
-              >
-                <img
-                  src={t.image_url}
-                  alt={t.name}
-                  className="w-full h-full object-cover"
-                  crossOrigin="anonymous"
-                  loading="lazy"
-                />
-                <span className="absolute bottom-1 left-1 right-1 text-[9px] font-medium text-white bg-black/40 backdrop-blur-sm px-1 py-0.5 rounded truncate">
-                  {t.name}
-                </span>
-              </button>
+      {loading ? (
+        <div className="h-12 rounded-xl bg-slate-100 animate-pulse" />
+      ) : (
+        <div className="relative">
+          <select
+            value={selectedId ?? ''}
+            onChange={handleChange}
+            className={[
+              'w-full px-4 py-3 pr-10 rounded-xl border-2 bg-white/70',
+              'font-display text-mundial-purple text-base',
+              'appearance-none cursor-pointer',
+              'focus:outline-none focus:ring-2 focus:ring-mundial-green/20 transition-colors',
+              selectedId !== null
+                ? 'border-mundial-green'
+                : 'border-mundial-purple/20 hover:border-mundial-green/50',
+            ].join(' ')}
+          >
+            <option value="">Sin fondo</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {flagFor(t.name)}  {t.name}
+              </option>
             ))}
-      </div>
+          </select>
+          <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+            <svg
+              className="w-4 h-4 text-mundial-purple/50"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

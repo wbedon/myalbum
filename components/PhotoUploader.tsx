@@ -115,7 +115,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
       // del paquete (ver package.json), de lo contrario fallan los hashes.
       const result = await removeBackground(file, {
         publicPath: 'https://staticimgly.com/@imgly/background-removal-data/1.7.0/dist/',
-        model: 'small',          // isnet_quint8 (~5MB, más compatible)
+        model: 'medium',         // isnet512 (~40MB, mejor calidad de bordes)
         device: 'cpu',           // evita rutas WebGPU experimentales
         proxyToWorker: false,    // evita problemas de Web Worker en Next dev
         debug: true,             // imprime info detallada en la consola

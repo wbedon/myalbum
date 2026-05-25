@@ -280,7 +280,7 @@ export default function CompositionEditor({
           <span
             style={{
               fontFamily: 'Anton, Impact, sans-serif',
-              fontSize: `${nameBand.font_size * 100}cqw`,
+              fontSize: `${(nameBand.font_size ?? 0.055) * 100}cqw`,
               color: nameBand.color ?? '#FFFFFF',
               textTransform: (nameBand.uppercase ?? true) ? 'uppercase' : 'none',
               fontWeight: 'bold',

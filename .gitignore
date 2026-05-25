@@ -22,4 +22,8 @@ npm-debug.log*
 next-env.d.ts
 *.tsbuildinfo
 
+# screenshots de verificación
+*.png
+verify-screenshots/
+
 .vercel

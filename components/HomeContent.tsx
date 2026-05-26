@@ -2,13 +2,19 @@
 
 import { useRef, useState, useCallback } from 'react'
 import Image from 'next/image'
+import type { User } from '@supabase/supabase-js'
 import PhotoUploader from './PhotoUploader'
 import PhotoGallery from './PhotoGallery'
 import HeroSection from './HeroSection'
 import { FlagUSA, FlagMexico, FlagCanada } from './MundialDecor'
 import type { Photo } from '@/lib/supabase'
 
-export default function HomeContent() {
+interface Props {
+  user: User
+  onLogout: () => Promise<void>
+}
+
+export default function HomeContent({ user, onLogout }: Props) {
   const [galleryKey, setGalleryKey] = useState(0)
   const [preloaded, setPreloaded] = useState<{ url: string; id: number } | null>(null)
   const uploaderRef = useRef<HTMLDivElement>(null)
@@ -42,10 +48,26 @@ export default function HomeContent() {
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 px-2.5 py-1 glass-dark rounded-full">
-            <FlagUSA className="h-3 w-4 rounded-sm" />
-            <FlagMexico className="h-3 w-4 rounded-sm" />
-            <FlagCanada className="h-3 w-4 rounded-sm" />
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 glass-dark rounded-full">
+              <FlagUSA className="h-3 w-4 rounded-sm" />
+              <FlagMexico className="h-3 w-4 rounded-sm" />
+              <FlagCanada className="h-3 w-4 rounded-sm" />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="hidden sm:inline-block text-[10px] text-white/50 font-condensed tracking-wide max-w-[140px] truncate">
+                {user.email}
+              </span>
+              <button
+                onClick={onLogout}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-xs font-condensed tracking-wider uppercase transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                </svg>
+                Salir
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -103,6 +125,7 @@ export default function HomeContent() {
                   onPhotoSaved={() => setGalleryKey((k) => k + 1)}
                   preloaded={preloaded}
                   onReset={handleUploaderReset}
+                  userId={user.id}
                 />
               </div>
             </div>

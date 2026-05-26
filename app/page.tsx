@@ -1,5 +1,5 @@
-import HomeContent from '@/components/HomeContent'
+import AuthGate from '@/components/AuthGate'
 
 export default function Home() {
-  return <HomeContent />
+  return <AuthGate />
 }

@@ -25,9 +25,10 @@ interface Props {
   onPhotoSaved?: () => void
   preloaded?: { url: string; id: number } | null
   onReset?: () => void
+  userId: string
 }
 
-export default function PhotoUploader({ onPhotoSaved, preloaded, onReset }: Props) {
+export default function PhotoUploader({ onPhotoSaved, preloaded, onReset, userId }: Props) {
   const [stage, setStage] = useState<Stage>('idle')
   const [originalUrl, setOriginalUrl] = useState<string | null>(null)
   const [processedUrl, setProcessedUrl] = useState<string | null>(null)
@@ -317,6 +318,7 @@ export default function PhotoUploader({ onPhotoSaved, preloaded, onReset }: Prop
         id,
         processed_url: publicUrl,
         template_id: isRealTemplateId ? selectedTemplate!.id : null,
+        user_id: userId,
       })
       if (dbErr) throw dbErr
 

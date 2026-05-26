@@ -1,19 +1,30 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import Image from 'next/image'
 import PhotoUploader from './PhotoUploader'
 import PhotoGallery from './PhotoGallery'
 import HeroSection from './HeroSection'
 import { FlagUSA, FlagMexico, FlagCanada } from './MundialDecor'
+import type { Photo } from '@/lib/supabase'
 
 export default function HomeContent() {
   const [galleryKey, setGalleryKey] = useState(0)
+  const [preloaded, setPreloaded] = useState<{ url: string; id: number } | null>(null)
   const uploaderRef = useRef<HTMLDivElement>(null)
 
   const scrollToUploader = () => {
     uploaderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+
+  const handleSelectFromGallery = useCallback((photo: Photo) => {
+    setPreloaded({ url: photo.processed_url, id: Date.now() })
+    uploaderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
+
+  const handleUploaderReset = useCallback(() => {
+    setPreloaded(null)
+  }, [])
 
   return (
     <div className="min-h-screen bg-mundial-cream flex flex-col relative">
@@ -88,7 +99,11 @@ export default function HomeContent() {
               <div className="absolute -bottom-3 -right-3 w-12 h-12 bg-host-gradient rounded-br-3xl rounded-tl-3xl z-0 shadow-md opacity-90" />
 
               <div className="relative glass-card rounded-3xl p-6 sm:p-10 z-10">
-                <PhotoUploader onPhotoSaved={() => setGalleryKey((k) => k + 1)} />
+                <PhotoUploader
+                  onPhotoSaved={() => setGalleryKey((k) => k + 1)}
+                  preloaded={preloaded}
+                  onReset={handleUploaderReset}
+                />
               </div>
             </div>
           </section>
@@ -113,7 +128,11 @@ export default function HomeContent() {
               </h3>
               <span className="h-px flex-1 bg-mundial-purple/15" />
             </div>
-            <PhotoGallery key={galleryKey} />
+            <PhotoGallery
+              key={galleryKey}
+              onSelectPhoto={handleSelectFromGallery}
+              onPhotoDeleted={() => setGalleryKey((k) => k + 1)}
+            />
           </section>
         </div>
       </main>

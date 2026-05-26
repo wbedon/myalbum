@@ -23,9 +23,11 @@ type Stage = 'idle' | 'loading' | 'processing' | 'done' | 'error'
 
 interface Props {
   onPhotoSaved?: () => void
+  preloaded?: { url: string; id: number } | null
+  onReset?: () => void
 }
 
-export default function PhotoUploader({ onPhotoSaved }: Props) {
+export default function PhotoUploader({ onPhotoSaved, preloaded, onReset }: Props) {
   const [stage, setStage] = useState<Stage>('idle')
   const [originalUrl, setOriginalUrl] = useState<string | null>(null)
   const [processedUrl, setProcessedUrl] = useState<string | null>(null)
@@ -101,6 +103,29 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
 
   // Mantiene la ref sincronizada para que el efecto de uniforme pueda leer el transform actual.
   useEffect(() => { transformRef.current = transform }, [transform])
+
+  // Carga una foto ya procesada proveniente de la galería.
+  useEffect(() => {
+    if (!preloaded) return
+    if (procUrlRef.current) { URL.revokeObjectURL(procUrlRef.current); procUrlRef.current = null }
+    if (origUrlRef.current) { URL.revokeObjectURL(origUrlRef.current); origUrlRef.current = null }
+    setOriginalUrl(preloaded.url)
+    setProcessedUrl(preloaded.url)
+    setProcessedBlob(null)
+    setStage('done')
+    setSavedOk(true)
+    setError(null)
+    setSelectedTemplate(null)
+    setSelectedUniform(null)
+    setWithUniform(true)
+    setTransform(null)
+    setCrop({ x: 0, y: 0, w: 1, h: 1 })
+    setUniformTransform(null)
+    setUniformCrop({ x: 0, y: 0, w: 1, h: 1 })
+    setPlayerName('')
+    setClubName('')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preloaded?.id])
 
   // Inicializa el transform del uniforme cuando se selecciona uno.
   // El offset vertical +0.30 posiciona la camiseta en el torso, no en la cabeza.
@@ -227,7 +252,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
   const [isDownloading, setIsDownloading] = useState(false)
 
   const handleDownload = useCallback(async () => {
-    if (!processedBlob || !processedUrl) return
+    if (!processedUrl) return
     setIsDownloading(true)
     try {
       let blob: Blob
@@ -243,8 +268,12 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
           uniformTransform: withUniform ? (uniformTransform ?? undefined) : undefined,
           uniformCrop: withUniform ? uniformCrop : undefined,
         })
-      } else {
+      } else if (processedBlob) {
         blob = processedBlob
+      } else {
+        // Foto de galería: descargar desde URL
+        const res = await fetch(processedUrl)
+        blob = await res.blob()
       }
 
       const a = document.createElement('a')
@@ -324,7 +353,8 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
     setUniformCrop({ x: 0, y: 0, w: 1, h: 1 })
     setPlayerName('')
     setClubName('')
-  }, [])
+    onReset?.()
+  }, [onReset])
 
   const isProcessing = stage === 'loading' || stage === 'processing'
 

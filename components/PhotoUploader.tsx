@@ -70,6 +70,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
   useEffect(() => { transformRef.current = transform }, [transform])
 
   // Inicializa el transform del uniforme cuando se selecciona uno.
+  // El offset vertical +0.30 posiciona la camiseta en el torso, no en la cabeza.
   useEffect(() => {
     if (!selectedUniform) {
       setUniformTransform(null)
@@ -77,7 +78,11 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
       return
     }
     const t = transformRef.current
-    setUniformTransform(t ? { ...t } : { x: 0.05, y: 0.3, width: 0.9 })
+    setUniformTransform(
+      t
+        ? { x: t.x, y: t.y + 0.30, width: t.width }
+        : { x: 0.05, y: 0.35, width: 0.9 }
+    )
     setUniformCrop({ x: 0, y: 0, w: 1, h: 1 })
   }, [selectedUniform])
 

@@ -40,6 +40,8 @@ export type ComposeOptions = {
   clubName?: string | null
   clubBand?: NameBand | null
   uniformUrl?: string | null
+  uniformTransform?: Transform | null
+  uniformCrop?: CropBox | null
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -68,11 +70,31 @@ export async function composeWithTemplate(
   let ctx: CanvasRenderingContext2D
 
   if (options?.transform) {
-    ;({ canvas, ctx } = buildWithTransform(cutout, template, options.transform, options.crop, uniform))
+    ;({ canvas, ctx } = buildWithTransform(cutout, template, options.transform, options.crop))
   } else if (options?.safeArea) {
     ;({ canvas, ctx } = buildWithSafeArea(cutout, template, options.safeArea))
   } else {
     ;({ canvas, ctx } = buildCover(cutout, template))
+  }
+
+  // Uniforme encima del cutout, con su propio transform/crop independiente
+  if (uniform && options?.uniformTransform) {
+    const tW = canvas.width, tH = canvas.height
+    const ut = options.uniformTransform
+    const uc = options.uniformCrop
+    const uFullW = ut.width * tW
+    const uFullH = uFullW * (uniform.naturalHeight / uniform.naturalWidth)
+    if (uc && (uc.x > 0 || uc.y > 0 || uc.w < 1 || uc.h < 1)) {
+      ctx.drawImage(
+        uniform,
+        uc.x * uniform.naturalWidth, uc.y * uniform.naturalHeight,
+        uc.w * uniform.naturalWidth, uc.h * uniform.naturalHeight,
+        ut.x * tW + uc.x * uFullW, ut.y * tH + uc.y * uFullH,
+        uc.w * uFullW, uc.h * uFullH
+      )
+    } else {
+      ctx.drawImage(uniform, ut.x * tW, ut.y * tH, uFullW, uFullH)
+    }
   }
 
   if (options?.playerName && options?.nameBand) {
@@ -94,8 +116,7 @@ function buildWithTransform(
   cutout: HTMLImageElement,
   template: HTMLImageElement,
   t: Transform,
-  crop?: CropBox | null,
-  uniform?: HTMLImageElement | null
+  crop?: CropBox | null
 ): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
   const tW = template.naturalWidth
   const tH = template.naturalHeight
@@ -107,12 +128,6 @@ function buildWithTransform(
   if (!ctx) throw new Error('Canvas 2D no disponible')
 
   ctx.drawImage(template, 0, 0)
-
-  if (uniform) {
-    const uDrawW = t.width * tW
-    const uDrawH = uDrawW * (uniform.naturalHeight / uniform.naturalWidth)
-    ctx.drawImage(uniform, t.x * tW, t.y * tH, uDrawW, uDrawH)
-  }
 
   const fullDrawW = t.width * tW
   const fullDrawH = fullDrawW * (cutout.naturalHeight / cutout.naturalWidth)

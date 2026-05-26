@@ -33,11 +33,14 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
   const [selectedUniform, setSelectedUniform] = useState<Uniform | null>(null)
   const [transform, setTransform] = useState<Transform | null>(null)
   const [crop, setCrop] = useState<CropBox>({ x: 0, y: 0, w: 1, h: 1 })
+  const [uniformTransform, setUniformTransform] = useState<Transform | null>(null)
+  const [uniformCrop, setUniformCrop] = useState<CropBox>({ x: 0, y: 0, w: 1, h: 1 })
   const [playerName, setPlayerName] = useState<string>('')
   const [clubName, setClubName] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const origUrlRef = useRef<string | null>(null)
   const procUrlRef = useRef<string | null>(null)
+  const transformRef = useRef<Transform | null>(null)
 
   useEffect(() => {
     setIsMobile(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent))
@@ -62,6 +65,21 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
     )
     setCrop({ x: 0, y: 0, w: 1, h: 1 })
   }, [selectedTemplate])
+
+  // Mantiene la ref sincronizada para que el efecto de uniforme pueda leer el transform actual.
+  useEffect(() => { transformRef.current = transform }, [transform])
+
+  // Inicializa el transform del uniforme cuando se selecciona uno.
+  useEffect(() => {
+    if (!selectedUniform) {
+      setUniformTransform(null)
+      setUniformCrop({ x: 0, y: 0, w: 1, h: 1 })
+      return
+    }
+    const t = transformRef.current
+    setUniformTransform(t ? { ...t } : { x: 0.05, y: 0.3, width: 0.9 })
+    setUniformCrop({ x: 0, y: 0, w: 1, h: 1 })
+  }, [selectedUniform])
 
   const processFile = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -184,6 +202,8 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
           clubName: clubName.trim() || undefined,
           clubBand: selectedTemplate.club_band ?? undefined,
           uniformUrl: selectedUniform?.image_url ?? undefined,
+          uniformTransform: uniformTransform ?? undefined,
+          uniformCrop,
         })
       } else {
         blob = processedBlob
@@ -203,7 +223,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
     } finally {
       setIsDownloading(false)
     }
-  }, [processedBlob, processedUrl, selectedTemplate, transform, crop, playerName, clubName, selectedUniform])
+  }, [processedBlob, processedUrl, selectedTemplate, transform, crop, playerName, clubName, selectedUniform, uniformTransform, uniformCrop])
 
   const handleSave = useCallback(async () => {
     if (!processedBlob) return
@@ -261,6 +281,8 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
     setSelectedUniform(null)
     setTransform(null)
     setCrop({ x: 0, y: 0, w: 1, h: 1 })
+    setUniformTransform(null)
+    setUniformCrop({ x: 0, y: 0, w: 1, h: 1 })
     setPlayerName('')
     setClubName('')
   }, [])
@@ -441,6 +463,10 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
                     clubName={clubName}
                     clubBand={selectedTemplate.club_band}
                     uniformUrl={selectedUniform?.image_url}
+                    uniformTransform={uniformTransform ?? undefined}
+                    onUniformTransformChange={setUniformTransform}
+                    uniformCrop={uniformCrop}
+                    onUniformCropChange={setUniformCrop}
                   />
                   <div className="mt-1.5 text-[10px] font-semibold text-mundial-purple/60 text-center">
                     Arrastrá para mover · handles blancos para recortar · círculo amarillo para redimensionar

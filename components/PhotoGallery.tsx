@@ -42,13 +42,14 @@ export default function PhotoGallery({ onSelectPhoto, onPhotoDeleted }: Props) {
     if (!selected) return
     setIsDeleting(true)
     setDeleteError(null)
+    const photoId = selected.id
     try {
-      await supabase.storage.from('photos').remove([`processed/${selected.id}.png`])
-      const { error } = await supabase.from('photos').delete().eq('id', selected.id)
+      await supabase.storage.from('photos').remove([`processed/${photoId}.png`])
+      const { error } = await supabase.from('photos').delete().eq('id', photoId)
       if (error) throw error
-      setPhotos((prev) => prev.filter((p) => p.id !== selected.id))
+      // Actualiza estado local sin remontar la galería (evita fetch que revierte el cambio)
+      setPhotos((prev) => prev.filter((p) => p.id !== photoId))
       closeLightbox()
-      onPhotoDeleted?.()
     } catch {
       setDeleteError('No se pudo eliminar. Intentá de nuevo.')
       setIsDeleting(false)

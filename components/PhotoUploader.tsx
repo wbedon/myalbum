@@ -84,8 +84,8 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
       .select('*')
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
-      .then(({ data, error }) => {
-        setAvailableUniforms(!error && data && data.length > 0 ? (data as Uniform[]) : LOCAL_UNIFORMS)
+      .then((res: { data: unknown[] | null; error: unknown }) => {
+        setAvailableUniforms(!res.error && res.data && res.data.length > 0 ? (res.data as Uniform[]) : LOCAL_UNIFORMS)
       })
       .catch(() => setAvailableUniforms(LOCAL_UNIFORMS))
   }, [])

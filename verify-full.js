@@ -53,10 +53,10 @@ function check(name, pass, detail = '') {
   check('🇨🇴 Colombia presente',         templateOptions.some(t => t.includes('Colombia')))
   check('🇻🇪 Venezuela presente',        templateOptions.some(t => t.includes('Venezuela')))
 
-  // ── 3. Sin plantilla: sin editor, sin uniform picker ───────────────────────
+  // ── 3. Sin plantilla: sin editor, sin toggle de uniforme ───────────────────
   console.log('\n── 3. Estado sin plantilla ──')
   const selectsBeforeTemplate = await page.locator('select').count()
-  check('UniformPicker oculto sin plantilla', selectsBeforeTemplate === 1, `${selectsBeforeTemplate} selects`)
+  check('Toggle uniforme oculto sin plantilla', selectsBeforeTemplate === 1, `${selectsBeforeTemplate} selects`)
 
   // Seleccionar Ecuador
   const tplVal = await page.locator('select').first()
@@ -80,29 +80,27 @@ function check(name, pass, detail = '') {
   check('Hint existe en la página',    hintCheck.exists)
   check('Hint está FUERA del editor',  hintCheck.exists && !hintCheck.inEditor)
 
-  // ── 5. Uniform picker ───────────────────────────────────────────────────────
-  console.log('\n── 5. UniformPicker ──')
-  await page.locator('select').nth(1).waitFor({ state: 'visible' })
+  // ── 5. Uniforme automático + toggle ─────────────────────────────────────────
+  console.log('\n── 5. Uniforme automático ──')
+  // Solo queda 1 select (plantilla); el uniforme es automático
   const selectsWithTemplate = await page.locator('select').count()
-  check('UniformPicker aparece con plantilla', selectsWithTemplate >= 2, `${selectsWithTemplate} selects`)
+  check('Solo 1 select visible (sin UniformPicker)', selectsWithTemplate === 1, `${selectsWithTemplate} selects`)
 
-  const uniformOptions = await page.locator('select').nth(1).locator('option').allTextContents()
-  check('Opción "Sin uniforme" presente', uniformOptions.some(t => t.includes('Sin uniforme')))
-  check('5 uniformes disponibles',        uniformOptions.length === 6, `${uniformOptions.length} opciones`)
+  // El toggle "Con uniforme" aparece automáticamente
+  await page.locator('label[for="with-uniform"]').waitFor({ state: 'visible' })
+  const toggleVisible = await page.locator('input#with-uniform').isVisible().catch(() => false)
+    || await page.locator('label[for="with-uniform"]').isVisible().catch(() => false)
+  check('Toggle "Con uniforme" visible', toggleVisible)
 
-  // Seleccionar uniforme Ecuador
-  const uniVal = await page.locator('select').nth(1)
-    .locator('option').filter({ hasText: 'Ecuador' }).getAttribute('value')
-  await page.locator('select').nth(1).selectOption({ value: uniVal ?? '' })
-  await page.waitForTimeout(800)
-
+  // El uniforme Ecuador se auto-selecciona al elegir la plantilla Ecuador
   const editor = page.locator('[style*="aspect-ratio"]').first()
+  await page.waitForTimeout(800)
   const imgCount = await editor.locator('img').count()
   const uniformSrc = await editor.locator('img').evaluateAll(
     imgs => imgs.map(i => i.getAttribute('src') ?? '')
   ).then(srcs => srcs.find(s => s.includes('/uniforms/')))
-  check('Capa de uniforme en el editor (≥3 imgs)', imgCount >= 3, `${imgCount} imgs`)
-  check('Src del uniforme apunta a /uniforms/',     !!uniformSrc, uniformSrc ?? 'no encontrado')
+  check('Uniforme Ecuador auto-seleccionado (≥3 imgs)', imgCount >= 3, `${imgCount} imgs`)
+  check('Src del uniforme apunta a /uniforms/',          !!uniformSrc, uniformSrc ?? 'no encontrado')
 
   // ── 6 & 7. Nombre + club ────────────────────────────────────────────────────
   console.log('\n── 6-7. Nombre y club ──')

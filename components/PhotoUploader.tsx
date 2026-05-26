@@ -4,8 +4,16 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import { supabase, isSupabaseConfigured, type Template, type Uniform } from '@/lib/supabase'
 import { composeWithTemplate, type Transform, type CropBox } from '@/lib/compose'
 import TemplatePicker from './TemplatePicker'
-import UniformPicker from './UniformPicker'
 import CompositionEditor from './CompositionEditor'
+
+// Fallback local cuando Supabase no está configurado o la tabla está vacía
+const LOCAL_UNIFORMS: Uniform[] = [
+  { id: 'local-arg', name: 'Argentina', image_url: '/uniforms/argentina.png', sort_order: 0, is_active: true, created_at: '' },
+  { id: 'local-bra', name: 'Brasil',    image_url: '/uniforms/brasil.png',    sort_order: 1, is_active: true, created_at: '' },
+  { id: 'local-col', name: 'Colombia',  image_url: '/uniforms/colombia.png',  sort_order: 2, is_active: true, created_at: '' },
+  { id: 'local-ecu', name: 'Ecuador',   image_url: '/uniforms/ecuador.png',   sort_order: 3, is_active: true, created_at: '' },
+  { id: 'local-ven', name: 'Venezuela', image_url: '/uniforms/venezuela.png', sort_order: 4, is_active: true, created_at: '' },
+]
 
 // TODO(inpainting): modo "Fondo sin persona". Intentado con inpaint-web (no
 // existe en npm). Plan B abierto: Hugging Face Inference API vía API route
@@ -31,6 +39,8 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
   const [isMobile, setIsMobile] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
   const [selectedUniform, setSelectedUniform] = useState<Uniform | null>(null)
+  const [availableUniforms, setAvailableUniforms] = useState<Uniform[]>([])
+  const [withUniform, setWithUniform] = useState(true)
   const [transform, setTransform] = useState<Transform | null>(null)
   const [crop, setCrop] = useState<CropBox>({ x: 0, y: 0, w: 1, h: 1 })
   const [uniformTransform, setUniformTransform] = useState<Transform | null>(null)
@@ -65,6 +75,29 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
     )
     setCrop({ x: 0, y: 0, w: 1, h: 1 })
   }, [selectedTemplate])
+
+  // Carga la lista de uniformes disponibles (una sola vez).
+  useEffect(() => {
+    if (!isSupabaseConfigured) { setAvailableUniforms(LOCAL_UNIFORMS); return }
+    supabase
+      .from('uniforms')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .then(({ data, error }) => {
+        setAvailableUniforms(!error && data && data.length > 0 ? (data as Uniform[]) : LOCAL_UNIFORMS)
+      })
+      .catch(() => setAvailableUniforms(LOCAL_UNIFORMS))
+  }, [])
+
+  // Auto-selecciona el uniforme del mismo país que la plantilla elegida.
+  useEffect(() => {
+    if (!selectedTemplate || availableUniforms.length === 0) { setSelectedUniform(null); return }
+    const match = availableUniforms.find(
+      u => u.name.toLowerCase() === selectedTemplate.name.toLowerCase()
+    )
+    setSelectedUniform(match ?? null)
+  }, [selectedTemplate, availableUniforms])
 
   // Mantiene la ref sincronizada para que el efecto de uniforme pueda leer el transform actual.
   useEffect(() => { transformRef.current = transform }, [transform])
@@ -206,9 +239,9 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
           nameBand: selectedTemplate.name_band ?? undefined,
           clubName: clubName.trim() || undefined,
           clubBand: selectedTemplate.club_band ?? undefined,
-          uniformUrl: selectedUniform?.image_url ?? undefined,
-          uniformTransform: uniformTransform ?? undefined,
-          uniformCrop,
+          uniformUrl: withUniform ? (selectedUniform?.image_url ?? undefined) : undefined,
+          uniformTransform: withUniform ? (uniformTransform ?? undefined) : undefined,
+          uniformCrop: withUniform ? uniformCrop : undefined,
         })
       } else {
         blob = processedBlob
@@ -228,7 +261,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
     } finally {
       setIsDownloading(false)
     }
-  }, [processedBlob, processedUrl, selectedTemplate, transform, crop, playerName, clubName, selectedUniform, uniformTransform, uniformCrop])
+  }, [processedBlob, processedUrl, selectedTemplate, transform, crop, playerName, clubName, selectedUniform, uniformTransform, uniformCrop, withUniform])
 
   const handleSave = useCallback(async () => {
     if (!processedBlob) return
@@ -284,6 +317,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
     setProgressPct(0)
     setSelectedTemplate(null)
     setSelectedUniform(null)
+    setWithUniform(true)
     setTransform(null)
     setCrop({ x: 0, y: 0, w: 1, h: 1 })
     setUniformTransform(null)
@@ -467,10 +501,10 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
                     nameBand={selectedTemplate.name_band}
                     clubName={clubName}
                     clubBand={selectedTemplate.club_band}
-                    uniformUrl={selectedUniform?.image_url}
-                    uniformTransform={uniformTransform ?? undefined}
+                    uniformUrl={withUniform ? selectedUniform?.image_url : undefined}
+                    uniformTransform={withUniform ? (uniformTransform ?? undefined) : undefined}
                     onUniformTransformChange={setUniformTransform}
-                    uniformCrop={uniformCrop}
+                    uniformCrop={withUniform ? uniformCrop : undefined}
                     onUniformCropChange={setUniformCrop}
                   />
                   <div className="mt-1.5 text-[10px] font-semibold text-mundial-purple/60 text-center">
@@ -495,12 +529,24 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
             onSelect={setSelectedTemplate}
           />
 
-          {/* Uniform picker — solo cuando hay plantilla seleccionada */}
-          {selectedTemplate && (
-            <UniformPicker
-              selectedId={selectedUniform?.id ?? null}
-              onSelect={setSelectedUniform}
-            />
+          {/* Toggle uniforme — solo cuando la plantilla tiene uniforme disponible */}
+          {selectedTemplate && selectedUniform && (
+            <label className="flex items-center gap-3 cursor-pointer select-none group">
+              <div className="relative">
+                <input
+                  id="with-uniform"
+                  type="checkbox"
+                  className="peer sr-only"
+                  checked={withUniform}
+                  onChange={(e) => setWithUniform(e.target.checked)}
+                />
+                <div className="w-11 h-6 rounded-full border-2 border-mundial-purple/20 bg-mundial-purple/10 peer-checked:bg-mundial-green peer-checked:border-mundial-green transition-all duration-200" />
+                <div className="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-200 peer-checked:translate-x-5" />
+              </div>
+              <span className="font-display text-sm text-mundial-purple/80 uppercase tracking-[0.15em]">
+                Con uniforme
+              </span>
+            </label>
           )}
 
           {/* Campos de nombre — solo aparecen si la plantilla tiene bandas */}

@@ -531,7 +531,7 @@ export default function PhotoUploader({ onPhotoSaved }: Props) {
 
           {/* Toggle uniforme — solo cuando la plantilla tiene uniforme disponible */}
           {selectedTemplate && selectedUniform && (
-            <label className="flex items-center gap-3 cursor-pointer select-none group">
+            <label htmlFor="with-uniform" className="flex items-center gap-3 cursor-pointer select-none group">
               <div className="relative">
                 <input
                   id="with-uniform"

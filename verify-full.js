@@ -86,10 +86,9 @@ function check(name, pass, detail = '') {
   const selectsWithTemplate = await page.locator('select').count()
   check('Solo 1 select visible (sin UniformPicker)', selectsWithTemplate === 1, `${selectsWithTemplate} selects`)
 
-  // El toggle "Con uniforme" aparece automáticamente
+  // El toggle "Con uniforme" aparece automáticamente (label wraps the hidden checkbox)
   await page.locator('label[for="with-uniform"]').waitFor({ state: 'visible' })
-  const toggleVisible = await page.locator('input#with-uniform').isVisible().catch(() => false)
-    || await page.locator('label[for="with-uniform"]').isVisible().catch(() => false)
+  const toggleVisible = await page.locator('label[for="with-uniform"]').isVisible()
   check('Toggle "Con uniforme" visible', toggleVisible)
 
   // El uniforme Ecuador se auto-selecciona al elegir la plantilla Ecuador

@@ -51,6 +51,8 @@ export default function AuthGate() {
       setError(
         msg.includes('Invalid login credentials')
           ? 'Email o contraseña incorrectos.'
+          : msg.includes('Email not confirmed')
+          ? 'Debés confirmar tu email antes de ingresar. Revisá tu bandeja de entrada.'
           : msg.includes('already registered')
           ? 'Ese email ya está registrado. Iniciá sesión.'
           : msg.includes('Password should be at least')

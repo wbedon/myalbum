@@ -56,7 +56,7 @@ export default function HomeContent({ user, onLogout }: Props) {
             </div>
             <div className="flex items-center gap-2">
               <span className="hidden sm:inline-block text-[10px] text-white/50 font-condensed tracking-wide max-w-[140px] truncate">
-                {user.email}
+                {(user.user_metadata?.username as string | undefined) ?? user.email?.replace('@myalbum.internal', '')}
               </span>
               <button
                 onClick={onLogout}

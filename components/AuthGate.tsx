@@ -8,15 +8,20 @@ import { FlagUSA, FlagMexico, FlagCanada } from './MundialDecor'
 
 type AuthMode = 'login' | 'register'
 
+const toAuthEmail = (username: string) =>
+  `${username.toLowerCase().trim()}@myalbum.internal`
+
+const USERNAME_RE = /^[a-zA-Z0-9_.\-]+$/
+
 export default function AuthGate() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<AuthMode>('login')
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [notifEmail, setNotifEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [registerDone, setRegisterDone] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -36,25 +41,49 @@ export default function AuthGate() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    const trimmed = username.trim()
+    if (!trimmed) { setError('El nombre de usuario es requerido.'); return }
+    if (!USERNAME_RE.test(trimmed)) {
+      setError('El usuario solo puede contener letras, números, puntos, guiones y guiones bajos.')
+      return
+    }
+
     setIsSubmitting(true)
+    const authEmail = toAuthEmail(trimmed)
+
     try {
       if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password })
         if (error) throw error
       } else {
-        const { error } = await supabase.auth.signUp({ email, password })
-        if (error) throw error
-        setRegisterDone(true)
+        const { error: signUpErr } = await supabase.auth.signUp({
+          email: authEmail,
+          password,
+          options: {
+            data: {
+              username: trimmed,
+              notification_email: notifEmail.trim() || null,
+            },
+          },
+        })
+        if (signUpErr) throw signUpErr
+        // El trigger auto-confirma; ingresamos directo sin verificar email
+        const { error: loginErr } = await supabase.auth.signInWithPassword({
+          email: authEmail,
+          password,
+        })
+        if (loginErr) throw loginErr
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Error de autenticación'
       setError(
         msg.includes('Invalid login credentials')
-          ? 'Email o contraseña incorrectos.'
+          ? 'Usuario o contraseña incorrectos.'
+          : msg.includes('already registered') || msg.includes('User already registered')
+          ? 'Ese nombre de usuario ya está en uso. Elegí otro.'
           : msg.includes('Email not confirmed')
-          ? 'Debés confirmar tu email antes de ingresar. Revisá tu bandeja de entrada.'
-          : msg.includes('already registered')
-          ? 'Ese email ya está registrado. Iniciá sesión.'
+          ? 'Error de confirmación. Contactá al administrador.'
           : msg.includes('Password should be at least')
           ? 'La contraseña debe tener al menos 6 caracteres.'
           : msg
@@ -62,6 +91,14 @@ export default function AuthGate() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const switchMode = () => {
+    setMode((m) => (m === 'login' ? 'register' : 'login'))
+    setError(null)
+    setUsername('')
+    setPassword('')
+    setNotifEmail('')
   }
 
   if (loading) {
@@ -95,10 +132,10 @@ export default function AuthGate() {
         </div>
       </div>
 
-      {/* Login card */}
+      {/* Card */}
       <div className="flex-1 flex items-center justify-center px-4 py-16">
         <div className="w-full max-w-sm">
-          {/* Decoración */}
+          {/* Header */}
           <div className="relative mb-8 text-center">
             <div className="inline-flex items-center gap-3 mb-4">
               <span className="h-px w-10 bg-mundial-purple/30" />
@@ -117,104 +154,103 @@ export default function AuthGate() {
             </p>
           </div>
 
-          {/* Card */}
           <div className="relative">
             <div className="absolute -top-2 -left-2 w-10 h-10 bg-mundial-yellow rounded-tl-2xl rounded-br-2xl z-0 shadow" />
             <div className="absolute -top-2 -right-2 w-10 h-10 bg-mundial-yellow rounded-tr-2xl rounded-bl-2xl z-0 shadow" />
 
             <div className="relative glass-card rounded-3xl p-8 z-10">
-              {registerDone ? (
-                <div className="text-center space-y-4 py-4">
-                  <div className="w-16 h-16 mx-auto rounded-full bg-mundial-green/15 flex items-center justify-center">
-                    <svg className="w-8 h-8 text-mundial-green" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                    </svg>
-                  </div>
-                  <p className="font-display text-lg tracking-wider uppercase text-mundial-purple">
-                    ¡Cuenta creada!
-                  </p>
-                  <p className="text-sm text-mundial-purple/70">
-                    Revisá tu email para confirmar tu cuenta y luego iniciá sesión.
-                  </p>
-                  <button
-                    onClick={() => { setMode('login'); setRegisterDone(false) }}
-                    className="mt-2 w-full py-3 bg-mundial-purple text-white font-display tracking-wider uppercase rounded-xl hover:bg-mundial-purple/90 transition-colors"
-                  >
-                    Ir al login
-                  </button>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Usuario */}
+                <div className="space-y-1.5">
+                  <label htmlFor="username" className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
+                    Usuario
+                  </label>
+                  <input
+                    id="username"
+                    type="text"
+                    required
+                    autoComplete="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Ej: jugador10"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
+                  />
                 </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
+
+                {/* Contraseña */}
+                <div className="space-y-1.5">
+                  <label htmlFor="password" className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
+                    Contraseña
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    required
+                    minLength={6}
+                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                    className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
+                  />
+                </div>
+
+                {/* Email opcional — solo en registro */}
+                {mode === 'register' && (
                   <div className="space-y-1.5">
-                    <label htmlFor="email" className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
-                      Email
+                    <label htmlFor="notif-email" className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
+                      Email <span className="normal-case font-sans font-normal text-mundial-purple/40">(opcional, para notificaciones)</span>
                     </label>
                     <input
-                      id="email"
+                      id="notif-email"
                       type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      value={notifEmail}
+                      onChange={(e) => setNotifEmail(e.target.value)}
                       placeholder="tu@email.com"
                       className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
                     />
                   </div>
+                )}
 
-                  <div className="space-y-1.5">
-                    <label htmlFor="password" className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
-                      Contraseña
-                    </label>
-                    <input
-                      id="password"
-                      type="password"
-                      required
-                      minLength={6}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Mínimo 6 caracteres"
-                      className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
-                    />
+                {/* Error */}
+                {error && (
+                  <div className="flex items-start gap-2 text-sm text-mundial-red bg-mundial-red/10 border border-mundial-red/30 rounded-xl px-4 py-3">
+                    <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                    </svg>
+                    {error}
                   </div>
+                )}
 
-                  {error && (
-                    <div className="flex items-start gap-2 text-sm text-mundial-red bg-mundial-red/10 border border-mundial-red/30 rounded-xl px-4 py-3">
-                      <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                      </svg>
-                      {error}
-                    </div>
+                {/* Submit */}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full py-3.5 bg-gradient-to-r from-mundial-purple to-mundial-purple/80 disabled:opacity-60 disabled:cursor-not-allowed text-white font-display text-base tracking-wider uppercase rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                >
+                  {isSubmitting && (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   )}
+                  {mode === 'login' ? 'Entrar' : 'Crear cuenta'}
+                </button>
 
+                <p className="text-center text-sm text-mundial-purple/60">
+                  {mode === 'login' ? '¿No tenés cuenta?' : '¿Ya tenés cuenta?'}{' '}
                   <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full py-3.5 bg-gradient-to-r from-mundial-purple to-mundial-purple/80 disabled:opacity-60 disabled:cursor-not-allowed text-white font-display text-base tracking-wider uppercase rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                    type="button"
+                    onClick={switchMode}
+                    className="font-semibold text-mundial-purple underline underline-offset-2 hover:text-mundial-green transition-colors"
                   >
-                    {isSubmitting && (
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    )}
-                    {mode === 'login' ? 'Entrar' : 'Crear cuenta'}
+                    {mode === 'login' ? 'Registrate' : 'Iniciá sesión'}
                   </button>
-
-                  <p className="text-center text-sm text-mundial-purple/60">
-                    {mode === 'login' ? '¿No tenés cuenta?' : '¿Ya tenés cuenta?'}{' '}
-                    <button
-                      type="button"
-                      onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(null) }}
-                      className="font-semibold text-mundial-purple underline underline-offset-2 hover:text-mundial-green transition-colors"
-                    >
-                      {mode === 'login' ? 'Registrate' : 'Iniciá sesión'}
-                    </button>
-                  </p>
-                </form>
-              )}
+                </p>
+              </form>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Footer mínimo */}
-      <div className="bg-mundial-navy-deep h-1.5 bg-host-gradient" />
+      <div className="h-1.5 bg-host-gradient" />
     </div>
   )
 }

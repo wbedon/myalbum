@@ -1,12 +1,14 @@
 'use client'
 
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import Image from 'next/image'
 import type { User } from '@supabase/supabase-js'
 import PhotoUploader from './PhotoUploader'
 import PhotoGallery from './PhotoGallery'
+import AdminPanel from './AdminPanel'
 import HeroSection from './HeroSection'
 import { FlagUSA, FlagMexico, FlagCanada } from './MundialDecor'
+import { supabase } from '@/lib/supabase'
 import type { Photo } from '@/lib/supabase'
 
 interface Props {
@@ -17,7 +19,20 @@ interface Props {
 export default function HomeContent({ user, onLogout }: Props) {
   const [galleryKey, setGalleryKey] = useState(0)
   const [preloaded, setPreloaded] = useState<{ url: string; id: number } | null>(null)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [showAdmin, setShowAdmin] = useState(false)
   const uploaderRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single()
+      .then(({ data }: { data: { role: string } | null }) => {
+        if (data?.role === 'superadmin') setIsSuperAdmin(true)
+      })
+  }, [user.id])
 
   const scrollToUploader = () => {
     uploaderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -55,6 +70,23 @@ export default function HomeContent({ user, onLogout }: Props) {
               <FlagCanada className="h-3 w-4 rounded-sm" />
             </div>
             <div className="flex items-center gap-2">
+              {isSuperAdmin && (
+                <button
+                  onClick={() => setShowAdmin((v) => !v)}
+                  className={[
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-condensed tracking-wider uppercase transition-colors',
+                    showAdmin
+                      ? 'bg-mundial-yellow text-mundial-purple'
+                      : 'bg-white/10 hover:bg-white/20 text-white/80 hover:text-white',
+                  ].join(' ')}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  {showAdmin ? 'Mi App' : 'Admin'}
+                </button>
+              )}
               <span className="hidden sm:inline-block text-[10px] text-white/50 font-condensed tracking-wide max-w-[140px] truncate">
                 {(user.user_metadata?.username as string | undefined) ?? user.email?.replace('@myalbum.internal', '')}
               </span>
@@ -73,10 +105,10 @@ export default function HomeContent({ user, onLogout }: Props) {
       </div>
 
       {/* ============== HERO ============== */}
-      <HeroSection onStartClick={scrollToUploader} />
+      {!showAdmin && <HeroSection onStartClick={scrollToUploader} />}
 
       {/* ============== MAIN ============== */}
-      <main className="relative flex-1 max-w-5xl w-full mx-auto px-4 py-16 sm:py-20 space-y-20">
+      <main className={['relative flex-1 max-w-5xl w-full mx-auto px-4 space-y-20', showAdmin ? 'py-10' : 'py-16 sm:py-20'].join(' ')}>
         {/* Marca de agua: foto del balón en cancha, sutil */}
         <div
           aria-hidden="true"
@@ -93,8 +125,15 @@ export default function HomeContent({ user, onLogout }: Props) {
           </div>
         </div>
 
+        {/* Panel Admin (reemplaza contenido cuando está activo) */}
+        {showAdmin && (
+          <div className="relative z-10">
+            <AdminPanel userId={user.id} />
+          </div>
+        )}
+
         {/* Contenido por encima de la marca de agua */}
-        <div className="relative z-10 space-y-20">
+        <div className={['relative z-10 space-y-20', showAdmin ? 'hidden' : ''].join(' ')}>
           {/* ============== UPLOADER SECTION ============== */}
           <section ref={uploaderRef} className="scroll-mt-20">
             {/* Header de sección */}

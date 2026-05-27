@@ -64,3 +64,17 @@ export type Photo = {
   name: string | null
   created_at: string
 }
+
+export type Profile = {
+  user_id: string
+  role: 'user' | 'superadmin'
+  created_at: string
+}
+
+export type Album = {
+  id: string
+  name: string
+  description: string | null
+  created_by: string | null
+  created_at: string
+}

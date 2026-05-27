@@ -67,6 +67,7 @@ export type Photo = {
 
 export type Profile = {
   user_id: string
+  username: string | null
   role: 'user' | 'superadmin'
   created_at: string
 }
@@ -77,4 +78,13 @@ export type Album = {
   description: string | null
   created_by: string | null
   created_at: string
+}
+
+export type AlbumMember = {
+  album_id: string
+  user_id: string
+  role: 'admin' | 'member'
+  added_by: string | null
+  created_at: string
+  username?: string
 }

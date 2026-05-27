@@ -6,6 +6,7 @@ import type { User } from '@supabase/supabase-js'
 import PhotoUploader from './PhotoUploader'
 import PhotoGallery from './PhotoGallery'
 import AdminPanel from './AdminPanel'
+import MyAlbumsPanel from './MyAlbumsPanel'
 import HeroSection from './HeroSection'
 import { FlagUSA, FlagMexico, FlagCanada } from './MundialDecor'
 import { supabase } from '@/lib/supabase'
@@ -20,7 +21,9 @@ export default function HomeContent({ user, onLogout }: Props) {
   const [galleryKey, setGalleryKey] = useState(0)
   const [preloaded, setPreloaded] = useState<{ url: string; id: number } | null>(null)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [isAlbumAdmin, setIsAlbumAdmin] = useState(false)
   const [showAdmin, setShowAdmin] = useState(false)
+  const [showMyAlbums, setShowMyAlbums] = useState(false)
   const uploaderRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -30,7 +33,19 @@ export default function HomeContent({ user, onLogout }: Props) {
       .eq('user_id', user.id)
       .single()
       .then(({ data }: { data: { role: string } | null }) => {
-        if (data?.role === 'superadmin') setIsSuperAdmin(true)
+        if (data?.role === 'superadmin') {
+          setIsSuperAdmin(true)
+        } else {
+          supabase
+            .from('album_members')
+            .select('album_id')
+            .eq('user_id', user.id)
+            .eq('role', 'admin')
+            .limit(1)
+            .then(({ data: rows }: { data: { album_id: string }[] | null }) => {
+              if (rows && rows.length > 0) setIsAlbumAdmin(true)
+            })
+        }
       })
   }, [user.id])
 
@@ -70,6 +85,22 @@ export default function HomeContent({ user, onLogout }: Props) {
               <FlagCanada className="h-3 w-4 rounded-sm" />
             </div>
             <div className="flex items-center gap-2">
+              {isAlbumAdmin && !isSuperAdmin && (
+                <button
+                  onClick={() => setShowMyAlbums((v) => !v)}
+                  className={[
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-condensed tracking-wider uppercase transition-colors',
+                    showMyAlbums
+                      ? 'bg-mundial-green text-white'
+                      : 'bg-white/10 hover:bg-white/20 text-white/80 hover:text-white',
+                  ].join(' ')}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                  </svg>
+                  {showMyAlbums ? 'Mi App' : 'Mis Álbumes'}
+                </button>
+              )}
               {isSuperAdmin && (
                 <button
                   onClick={() => setShowAdmin((v) => !v)}
@@ -105,10 +136,10 @@ export default function HomeContent({ user, onLogout }: Props) {
       </div>
 
       {/* ============== HERO ============== */}
-      {!showAdmin && <HeroSection onStartClick={scrollToUploader} />}
+      {!showAdmin && !showMyAlbums && <HeroSection onStartClick={scrollToUploader} />}
 
       {/* ============== MAIN ============== */}
-      <main className={['relative flex-1 max-w-5xl w-full mx-auto px-4 space-y-20', showAdmin ? 'py-10' : 'py-16 sm:py-20'].join(' ')}>
+      <main className={['relative flex-1 max-w-5xl w-full mx-auto px-4 space-y-20', (showAdmin || showMyAlbums) ? 'py-10' : 'py-16 sm:py-20'].join(' ')}>
         {/* Marca de agua: foto del balón en cancha, sutil */}
         <div
           aria-hidden="true"
@@ -132,8 +163,15 @@ export default function HomeContent({ user, onLogout }: Props) {
           </div>
         )}
 
+        {/* Panel Mis Álbumes */}
+        {showMyAlbums && !showAdmin && (
+          <div className="relative z-10">
+            <MyAlbumsPanel userId={user.id} />
+          </div>
+        )}
+
         {/* Contenido por encima de la marca de agua */}
-        <div className={['relative z-10 space-y-20', showAdmin ? 'hidden' : ''].join(' ')}>
+        <div className={['relative z-10 space-y-20', (showAdmin || showMyAlbums) ? 'hidden' : ''].join(' ')}>
           {/* ============== UPLOADER SECTION ============== */}
           <section ref={uploaderRef} className="scroll-mt-20">
             {/* Header de sección */}

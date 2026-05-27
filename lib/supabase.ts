@@ -1,7 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Valores placeholder cuando no hay .env.local — permiten que el build estático
-// se complete. En producción debes configurar las variables reales en Vercel.
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key'
 
@@ -10,30 +8,21 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 export const isSupabaseConfigured =
   !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-/**
- * Zona donde debe ubicarse el cutout dentro de la plantilla.
- * Coordenadas normalizadas (0–1) relativas al tamaño de la plantilla.
- * Si no se define, el cutout cubre todo el canvas (comportamiento simple).
- */
 export type SafeArea = {
-  x: number       // 0 = izquierda, 1 = derecha
-  y: number       // 0 = arriba,   1 = abajo
-  width: number   // ancho en fracción
-  height: number  // alto en fracción
+  x: number
+  y: number
+  width: number
+  height: number
 }
 
-/**
- * Región de la plantilla donde se superpone el nombre del jugador.
- * Coordenadas normalizadas (0–1). Configurado por plantilla en Supabase.
- */
 export type NameBand = {
-  x: number           // fracción 0–1
-  y: number           // fracción 0–1
-  width: number       // fracción 0–1
-  height: number      // fracción 0–1
-  color?: string      // color del texto (default '#FFFFFF')
-  font_size?: number  // fracción del ancho del canvas (default 0.055)
-  uppercase?: boolean // default true
+  x: number
+  y: number
+  width: number
+  height: number
+  color?: string
+  font_size?: number
+  uppercase?: boolean
 }
 
 export type Template = {
@@ -78,6 +67,7 @@ export type Album = {
   description: string | null
   created_by: string | null
   created_at: string
+  pack_size: number
 }
 
 export type AlbumMember = {
@@ -87,4 +77,23 @@ export type AlbumMember = {
   added_by: string | null
   created_at: string
   username?: string
+}
+
+export type AlbumSlot = {
+  id: string
+  album_id: string
+  slot_number: number
+  label: string | null
+  created_at: string
+}
+
+export type Invitation = {
+  id: string
+  album_id: string
+  token: string
+  created_by: string | null
+  expires_at: string | null
+  max_uses: number | null
+  uses_count: number
+  created_at: string
 }

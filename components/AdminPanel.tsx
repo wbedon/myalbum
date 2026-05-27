@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, type Album } from '@/lib/supabase'
-import AlbumDetail from './AlbumDetail'
+import CampaignDetail from './CampaignDetail'
 
 interface Props {
   userId: string
@@ -14,6 +14,7 @@ export default function AdminPanel({ userId }: Props) {
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [packSize, setPackSize] = useState(5)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -41,12 +42,14 @@ export default function AdminPanel({ userId }: Props) {
       name: name.trim(),
       description: description.trim() || null,
       created_by: userId,
+      pack_size: packSize,
     })
     if (error) {
       setError(error.message)
     } else {
       setName('')
       setDescription('')
+      setPackSize(5)
       setShowForm(false)
       fetchAlbums()
     }
@@ -64,13 +67,13 @@ export default function AdminPanel({ userId }: Props) {
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
 
-  // Vista detalle de álbum seleccionado
   if (selectedAlbum) {
     return (
-      <AlbumDetail
+      <CampaignDetail
         album={selectedAlbum}
         currentUserId={userId}
         canAssignAdmin={true}
+        userRole="admin"
         onBack={() => setSelectedAlbum(null)}
       />
     )
@@ -88,7 +91,7 @@ export default function AdminPanel({ userId }: Props) {
             </h2>
           </div>
           <p className="ml-5 text-sm text-mundial-purple/60">
-            {albums.length} álbum{albums.length !== 1 ? 'es' : ''} creado{albums.length !== 1 ? 's' : ''}
+            {albums.length} campaña{albums.length !== 1 ? 's' : ''} creada{albums.length !== 1 ? 's' : ''}
           </p>
         </div>
 
@@ -102,7 +105,7 @@ export default function AdminPanel({ userId }: Props) {
               : <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
             }
           </svg>
-          {showForm ? 'Cancelar' : 'Crear álbum'}
+          {showForm ? 'Cancelar' : 'Nueva campaña'}
         </button>
       </div>
 
@@ -110,12 +113,12 @@ export default function AdminPanel({ userId }: Props) {
       {showForm && (
         <div className="glass-card rounded-2xl p-6 border-2 border-mundial-yellow/40">
           <h3 className="font-display text-lg tracking-wider uppercase text-mundial-purple mb-5">
-            Nuevo Álbum
+            Nueva Campaña
           </h3>
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="space-y-1.5">
               <label className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
-                Nombre del álbum *
+                Nombre de la campaña *
               </label>
               <input
                 type="text"
@@ -133,10 +136,26 @@ export default function AdminPanel({ userId }: Props) {
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Descripción del álbum..."
+                placeholder="Descripción de la campaña..."
                 rows={2}
                 className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors resize-none"
               />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
+                Cromos por sobre
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min={2}
+                  max={20}
+                  value={packSize}
+                  onChange={(e) => setPackSize(Number(e.target.value))}
+                  className="w-24 px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
+                />
+                <span className="text-sm text-mundial-purple/50">cromos aleatorios incluidos en cada sobre</span>
+              </div>
             </div>
             {error && (
               <div className="text-sm text-mundial-red bg-mundial-red/10 border border-mundial-red/30 rounded-xl px-4 py-3">
@@ -149,13 +168,13 @@ export default function AdminPanel({ userId }: Props) {
               className="inline-flex items-center gap-2 px-6 py-3 bg-mundial-purple disabled:opacity-60 text-white font-display text-sm tracking-wider uppercase rounded-xl hover:bg-mundial-purple/90 transition-colors"
             >
               {isSaving && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-              Crear álbum
+              Crear campaña
             </button>
           </form>
         </div>
       )}
 
-      {/* Lista de álbumes */}
+      {/* Lista de campañas */}
       {loading ? (
         <div className="grid gap-3">
           {[1, 2].map((i) => <div key={i} className="h-24 rounded-2xl bg-mundial-cream animate-pulse" />)}
@@ -167,14 +186,13 @@ export default function AdminPanel({ userId }: Props) {
               <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
             </svg>
           </div>
-          <p className="font-display text-lg tracking-wider uppercase text-mundial-purple/60">Sin álbumes todavía</p>
-          <p className="text-sm text-mundial-purple/40">Creá el primer álbum con el botón de arriba.</p>
+          <p className="font-display text-lg tracking-wider uppercase text-mundial-purple/60">Sin campañas todavía</p>
+          <p className="text-sm text-mundial-purple/40">Creá la primera campaña con el botón de arriba.</p>
         </div>
       ) : (
         <div className="grid gap-3">
           {albums.map((album) => (
             <div key={album.id} className="glass-card rounded-2xl p-5 flex items-center gap-4 group">
-              {/* Ícono — click abre detalle */}
               <button
                 onClick={() => setSelectedAlbum(album)}
                 className="flex-1 flex items-center gap-4 text-left min-w-0"
@@ -191,7 +209,9 @@ export default function AdminPanel({ userId }: Props) {
                   {album.description && (
                     <p className="text-sm text-mundial-purple/60 truncate mt-0.5">{album.description}</p>
                   )}
-                  <p className="text-xs text-mundial-purple/40 mt-1">Creado el {formatDate(album.created_at)}</p>
+                  <p className="text-xs text-mundial-purple/40 mt-1">
+                    {formatDate(album.created_at)} · {album.pack_size} cromos/sobre
+                  </p>
                 </div>
                 <svg className="w-5 h-5 text-mundial-purple/20 group-hover:text-mundial-green transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />

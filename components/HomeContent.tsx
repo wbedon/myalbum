@@ -21,9 +21,9 @@ export default function HomeContent({ user, onLogout }: Props) {
   const [galleryKey, setGalleryKey] = useState(0)
   const [preloaded, setPreloaded] = useState<{ url: string; id: number } | null>(null)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
-  const [isAlbumAdmin, setIsAlbumAdmin] = useState(false)
+  const [hasCampaigns, setHasCampaigns] = useState(false)
   const [showAdmin, setShowAdmin] = useState(false)
-  const [showMyAlbums, setShowMyAlbums] = useState(false)
+  const [showMyCampaigns, setShowMyCampaigns] = useState(false)
   const uploaderRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -35,17 +35,16 @@ export default function HomeContent({ user, onLogout }: Props) {
       .then(({ data }: { data: { role: string } | null }) => {
         if (data?.role === 'superadmin') {
           setIsSuperAdmin(true)
-        } else {
-          supabase
-            .from('album_members')
-            .select('album_id')
-            .eq('user_id', user.id)
-            .eq('role', 'admin')
-            .limit(1)
-            .then(({ data: rows }: { data: { album_id: string }[] | null }) => {
-              if (rows && rows.length > 0) setIsAlbumAdmin(true)
-            })
         }
+      })
+
+    supabase
+      .from('album_members')
+      .select('album_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .then(({ data }: { data: { album_id: string }[] | null }) => {
+        if (data && data.length > 0) setHasCampaigns(true)
       })
   }, [user.id])
 
@@ -64,7 +63,7 @@ export default function HomeContent({ user, onLogout }: Props) {
 
   return (
     <div className="min-h-screen bg-mundial-cream flex flex-col relative">
-      {/* ============== TOP BAR fina con identidad de marca ============== */}
+      {/* ============== TOP BAR ============== */}
       <div className="relative bg-mundial-navy-deep text-white z-20">
         <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
@@ -85,12 +84,13 @@ export default function HomeContent({ user, onLogout }: Props) {
               <FlagCanada className="h-3 w-4 rounded-sm" />
             </div>
             <div className="flex items-center gap-2">
-              {isAlbumAdmin && !isSuperAdmin && (
+              {/* Mis Campañas — visible para cualquier miembro */}
+              {hasCampaigns && !isSuperAdmin && (
                 <button
-                  onClick={() => setShowMyAlbums((v) => !v)}
+                  onClick={() => { setShowMyCampaigns((v) => !v); setShowAdmin(false) }}
                   className={[
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-condensed tracking-wider uppercase transition-colors',
-                    showMyAlbums
+                    showMyCampaigns
                       ? 'bg-mundial-green text-white'
                       : 'bg-white/10 hover:bg-white/20 text-white/80 hover:text-white',
                   ].join(' ')}
@@ -98,12 +98,13 @@ export default function HomeContent({ user, onLogout }: Props) {
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
                   </svg>
-                  {showMyAlbums ? 'Mi App' : 'Mis Álbumes'}
+                  {showMyCampaigns ? 'Mi App' : 'Mis Campañas'}
                 </button>
               )}
+              {/* Panel Admin — solo superadmin */}
               {isSuperAdmin && (
                 <button
-                  onClick={() => setShowAdmin((v) => !v)}
+                  onClick={() => { setShowAdmin((v) => !v); setShowMyCampaigns(false) }}
                   className={[
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-condensed tracking-wider uppercase transition-colors',
                     showAdmin
@@ -136,11 +137,10 @@ export default function HomeContent({ user, onLogout }: Props) {
       </div>
 
       {/* ============== HERO ============== */}
-      {!showAdmin && !showMyAlbums && <HeroSection onStartClick={scrollToUploader} />}
+      {!showAdmin && !showMyCampaigns && <HeroSection onStartClick={scrollToUploader} />}
 
       {/* ============== MAIN ============== */}
-      <main className={['relative flex-1 max-w-5xl w-full mx-auto px-4 space-y-20', (showAdmin || showMyAlbums) ? 'py-10' : 'py-16 sm:py-20'].join(' ')}>
-        {/* Marca de agua: foto del balón en cancha, sutil */}
+      <main className={['relative flex-1 max-w-5xl w-full mx-auto px-4 space-y-20', (showAdmin || showMyCampaigns) ? 'py-10' : 'py-16 sm:py-20'].join(' ')}>
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 overflow-hidden -z-0"
@@ -156,25 +156,21 @@ export default function HomeContent({ user, onLogout }: Props) {
           </div>
         </div>
 
-        {/* Panel Admin (reemplaza contenido cuando está activo) */}
         {showAdmin && (
           <div className="relative z-10">
             <AdminPanel userId={user.id} />
           </div>
         )}
 
-        {/* Panel Mis Álbumes */}
-        {showMyAlbums && !showAdmin && (
+        {showMyCampaigns && !showAdmin && (
           <div className="relative z-10">
             <MyAlbumsPanel userId={user.id} />
           </div>
         )}
 
-        {/* Contenido por encima de la marca de agua */}
-        <div className={['relative z-10 space-y-20', (showAdmin || showMyAlbums) ? 'hidden' : ''].join(' ')}>
+        <div className={['relative z-10 space-y-20', (showAdmin || showMyCampaigns) ? 'hidden' : ''].join(' ')}>
           {/* ============== UPLOADER SECTION ============== */}
           <section ref={uploaderRef} className="scroll-mt-20">
-            {/* Header de sección */}
             <div className="mb-8 text-center">
               <div className="inline-flex items-center gap-3 mb-3">
                 <span className="h-px w-12 bg-mundial-purple/30" />
@@ -191,7 +187,6 @@ export default function HomeContent({ user, onLogout }: Props) {
               </p>
             </div>
 
-            {/* Card glassmorphism con ribbons amarillas en esquinas */}
             <div className="relative">
               <div className="absolute -top-3 -left-3 w-16 h-16 bg-mundial-yellow rounded-tl-3xl rounded-br-3xl z-0 shadow-lg" />
               <div className="absolute -top-3 -right-3 w-16 h-16 bg-mundial-yellow rounded-tr-3xl rounded-bl-3xl z-0 shadow-lg" />
@@ -239,10 +234,7 @@ export default function HomeContent({ user, onLogout }: Props) {
 
       {/* ============== FOOTER ============== */}
       <footer className="relative bg-mundial-navy-deep text-white mt-12 overflow-hidden">
-        {/* Banda tricolor host arriba */}
         <div className="h-1.5 bg-host-gradient" />
-
-        {/* Subtle hex pattern overlay */}
         <div className="absolute inset-0 bg-hexagons opacity-50 pointer-events-none" />
 
         <div className="relative max-w-5xl mx-auto px-4 py-10 grid sm:grid-cols-3 gap-8">

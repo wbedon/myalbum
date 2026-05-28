@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { supabase, type Album, type AlbumMember, type AlbumSlot, type Invitation } from '@/lib/supabase'
+import { supabase, type Album, type AlbumMember, type AlbumSlot, type Invitation, type Sticker } from '@/lib/supabase'
+import StickerEditor from './StickerEditor'
 
 interface Props {
   album: Album
@@ -12,7 +13,13 @@ interface Props {
   onBack: () => void
 }
 
-type Tab = 'participants' | 'slots' | 'invitations'
+type Tab = 'participants' | 'slots' | 'invitations' | 'stickers' | 'review'
+
+interface PendingStickerMeta extends Sticker {
+  username?: string
+  slotNumber?: number
+  slotLabel?: string | null
+}
 
 export default function CampaignDetail({ album, currentUserId, canAssignAdmin, userRole, onBack }: Props) {
   const isAdminView = canAssignAdmin || userRole === 'admin'
@@ -139,7 +146,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   }, [album.id])
 
   useEffect(() => {
-    if (tab === 'slots' && !slotsFetched) fetchSlots()
+    if ((tab === 'slots') && !slotsFetched) fetchSlots()
   }, [tab, slotsFetched, fetchSlots])
 
   // Sugerir el siguiente número disponible
@@ -188,6 +195,18 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [expandedQR, setExpandedQR] = useState<string | null>(null)
 
+  // ── Mis Cromos ────────────────────────────────────────────────────
+  const [myStickers, setMyStickers] = useState<Sticker[]>([])
+  const [myStickersFetched, setMyStickersFetched] = useState(false)
+  const [selectedSlotForEditor, setSelectedSlotForEditor] = useState<AlbumSlot | null>(null)
+
+  // ── Revisión (admin) ──────────────────────────────────────────────
+  const [pendingStickers, setPendingStickers] = useState<PendingStickerMeta[]>([])
+  const [pendingFetched, setPendingFetched] = useState(false)
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [isReviewing, setIsReviewing] = useState(false)
+
   const fetchInvitations = useCallback(async () => {
     setInvLoading(true)
     const { data } = await supabase
@@ -203,6 +222,83 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   useEffect(() => {
     if (tab === 'invitations' && !invFetched) fetchInvitations()
   }, [tab, invFetched, fetchInvitations])
+
+  const fetchMyStickers = useCallback(async () => {
+    const { data } = await supabase
+      .from('stickers')
+      .select('*')
+      .eq('album_id', album.id)
+      .eq('user_id', currentUserId)
+    if (data) setMyStickers(data as Sticker[])
+    setMyStickersFetched(true)
+  }, [album.id, currentUserId])
+
+  const fetchPendingStickers = useCallback(async () => {
+    const { data } = await supabase
+      .from('stickers')
+      .select('*')
+      .eq('album_id', album.id)
+      .eq('status', 'pending')
+    if (!data || data.length === 0) { setPendingStickers([]); setPendingFetched(true); return }
+    const userIds = [...new Set((data as Sticker[]).map((s) => s.user_id))]
+    const slotIds = [...new Set((data as Sticker[]).map((s) => s.slot_id))]
+    const [{ data: profiles }, { data: slotsData }] = await Promise.all([
+      supabase.from('profiles').select('user_id, username').in('user_id', userIds),
+      supabase.from('album_slots').select('id, slot_number, label').in('id', slotIds),
+    ])
+    setPendingStickers(
+      (data as Sticker[]).map((s) => ({
+        ...s,
+        username: (profiles as { user_id: string; username: string | null }[] | null)?.find((p) => p.user_id === s.user_id)?.username ?? s.user_id.slice(0, 8),
+        slotNumber: (slotsData as { id: string; slot_number: number; label: string | null }[] | null)?.find((sl) => sl.id === s.slot_id)?.slot_number,
+        slotLabel: (slotsData as { id: string; slot_number: number; label: string | null }[] | null)?.find((sl) => sl.id === s.slot_id)?.label ?? null,
+      }))
+    )
+    setPendingFetched(true)
+  }, [album.id])
+
+  useEffect(() => {
+    if ((tab === 'stickers') && !myStickersFetched) fetchMyStickers()
+  }, [tab, myStickersFetched, fetchMyStickers])
+
+  useEffect(() => {
+    if ((tab === 'stickers' || tab === 'review') && !slotsFetched) fetchSlots()
+  }, [tab, slotsFetched, fetchSlots])
+
+  useEffect(() => {
+    if (tab === 'review' && !pendingFetched) fetchPendingStickers()
+  }, [tab, pendingFetched, fetchPendingStickers])
+
+  const handleApprove = async (stickerId: string) => {
+    setIsReviewing(true)
+    const { error } = await supabase.from('stickers').update({ status: 'approved' }).eq('id', stickerId)
+    if (!error) setPendingStickers((prev) => prev.filter((s) => s.id !== stickerId))
+    setIsReviewing(false)
+  }
+
+  const handleReject = async (stickerId: string) => {
+    if (!rejectReason.trim()) return
+    setIsReviewing(true)
+    const { error } = await supabase
+      .from('stickers')
+      .update({ status: 'rejected', rejection_reason: rejectReason.trim() })
+      .eq('id', stickerId)
+    if (!error) {
+      setPendingStickers((prev) => prev.filter((s) => s.id !== stickerId))
+      setRejectingId(null)
+      setRejectReason('')
+    }
+    setIsReviewing(false)
+  }
+
+  const handleStickerSaved = useCallback((sticker: Sticker) => {
+    setMyStickers((prev) => {
+      const idx = prev.findIndex((s) => s.slot_id === sticker.slot_id)
+      if (idx >= 0) { const next = [...prev]; next[idx] = sticker; return next }
+      return [...prev, sticker]
+    })
+    setSelectedSlotForEditor(null)
+  }, [])
 
   const handleCreateInvitation = async () => {
     setInvError(null)
@@ -284,9 +380,15 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-mundial-cream rounded-xl p-1 w-fit">
-        {(['participants', ...(isAdminView ? ['slots', 'invitations'] : ['slots'])] as Tab[]).map((t) => {
-          const labels: Record<Tab, string> = { participants: 'Participantes', slots: 'Slots', invitations: 'Invitaciones' }
+      <div className="flex flex-wrap gap-1 bg-mundial-cream rounded-xl p-1 w-fit">
+        {(isAdminView
+          ? ['participants', 'slots', 'invitations', 'stickers', 'review'] as Tab[]
+          : ['participants', 'slots', 'stickers'] as Tab[]
+        ).map((t) => {
+          const labels: Record<Tab, string> = {
+            participants: 'Participantes', slots: 'Slots', invitations: 'Invitaciones',
+            stickers: 'Mis Cromos', review: 'Revisión',
+          }
           return (
             <button
               key={t}
@@ -507,6 +609,215 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Tab: Mis Cromos ───────────────────────────────────────── */}
+      {tab === 'stickers' && (
+        <div className="space-y-5">
+          {selectedSlotForEditor ? (
+            <StickerEditor
+              albumId={album.id}
+              slot={selectedSlotForEditor}
+              currentUserId={currentUserId}
+              existingSticker={myStickers.find((s) => s.slot_id === selectedSlotForEditor.id) ?? null}
+              onSave={handleStickerSaved}
+              onClose={() => setSelectedSlotForEditor(null)}
+            />
+          ) : (
+            <>
+              {/* Info banner */}
+              <div className="flex items-center gap-3 px-5 py-3 bg-mundial-green/10 border border-mundial-green/30 rounded-2xl">
+                <svg className="w-5 h-5 text-mundial-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                </svg>
+                <span className="font-condensed text-sm font-bold text-mundial-purple">
+                  {myStickers.filter((s) => s.status === 'approved').length}/{slots.length} cromos aprobados
+                </span>
+              </div>
+
+              {/* Slot grid */}
+              {(slotsLoading || !myStickersFetched) ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {[1, 2, 3, 4].map((i) => <div key={i} className="h-32 rounded-2xl bg-mundial-cream animate-pulse" />)}
+                </div>
+              ) : slots.length === 0 ? (
+                <div className="text-center py-14 bg-white rounded-2xl border-2 border-dashed border-mundial-purple/15 space-y-2">
+                  <p className="font-display text-base tracking-wider uppercase text-mundial-purple/50">Sin slots definidos</p>
+                  <p className="text-sm text-mundial-purple/35">El organizador todavía no creó los slots de esta campaña.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {slots.map((slot) => {
+                    const sticker = myStickers.find((s) => s.slot_id === slot.id)
+                    const statusConfig: Record<string, { label: string; dot: string; bg: string }> = {
+                      draft:    { label: 'Borrador',    dot: 'bg-mundial-yellow-dark', bg: 'bg-mundial-yellow/10 border-mundial-yellow/30' },
+                      pending:  { label: 'En revisión', dot: 'bg-mundial-purple',      bg: 'bg-mundial-purple/10 border-mundial-purple/20' },
+                      approved: { label: 'Aprobado',    dot: 'bg-mundial-green',       bg: 'bg-mundial-green/10 border-mundial-green/30' },
+                      rejected: { label: 'Rechazado',   dot: 'bg-mundial-red',         bg: 'bg-mundial-red/10 border-mundial-red/25' },
+                    }
+                    const cfg = sticker ? statusConfig[sticker.status] : null
+                    const canEdit = !sticker || sticker.status === 'draft' || sticker.status === 'rejected'
+                    return (
+                      <div
+                        key={slot.id}
+                        className={[
+                          'relative rounded-2xl border-2 overflow-hidden transition-all duration-200',
+                          canEdit
+                            ? 'cursor-pointer hover:shadow-lg hover:scale-[1.02] border-mundial-purple/15 bg-white/70'
+                            : cfg?.bg ?? 'border-mundial-purple/15 bg-white/70',
+                        ].join(' ')}
+                        onClick={() => canEdit && setSelectedSlotForEditor(slot)}
+                      >
+                        {/* Sticker thumbnail or placeholder */}
+                        {sticker ? (
+                          <div className="aspect-[3/4] bg-mundial-cream">
+                            <img src={sticker.image_url} alt="" className="w-full h-full object-contain" />
+                          </div>
+                        ) : (
+                          <div className="aspect-[3/4] flex items-center justify-center bg-mundial-cream/50">
+                            <div className="text-center space-y-2">
+                              <div className="w-10 h-10 mx-auto rounded-xl bg-mundial-purple/10 flex items-center justify-center">
+                                <span className="font-display text-lg text-mundial-purple font-bold">{slot.slot_number}</span>
+                              </div>
+                              <p className="text-xs text-mundial-purple/40 font-condensed font-bold">+ Crear</p>
+                            </div>
+                          </div>
+                        )}
+                        {/* Footer */}
+                        <div className="px-3 py-2 space-y-1 bg-white/90 border-t border-mundial-purple/10">
+                          <p className="font-display text-xs tracking-wide uppercase text-mundial-purple truncate">
+                            #{slot.slot_number} {slot.label ?? ''}
+                          </p>
+                          {cfg ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                              <span className="text-[10px] font-condensed font-bold tracking-wider uppercase text-mundial-purple/60">{cfg.label}</span>
+                            </div>
+                          ) : (
+                            <p className="text-[10px] font-condensed font-bold tracking-wider uppercase text-mundial-purple/35">Sin cromo</p>
+                          )}
+                        </div>
+                        {/* Rejected reason tooltip */}
+                        {sticker?.status === 'rejected' && sticker.rejection_reason && (
+                          <div className="absolute top-2 right-2">
+                            <div className="w-5 h-5 rounded-full bg-mundial-red flex items-center justify-center" title={sticker.rejection_reason}>
+                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── Tab: Revisión (admin) ──────────────────────────────────── */}
+      {tab === 'review' && isAdminView && (
+        <div className="space-y-5">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-5 py-3 bg-mundial-purple/10 border border-mundial-purple/20 rounded-2xl">
+            <svg className="w-5 h-5 text-mundial-purple/70 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="font-condensed text-sm font-bold text-mundial-purple">
+              {pendingStickers.length} cromo{pendingStickers.length !== 1 ? 's' : ''} esperando revisión
+            </span>
+          </div>
+
+          {!pendingFetched ? (
+            <div className="grid gap-4">
+              {[1, 2].map((i) => <div key={i} className="h-28 rounded-2xl bg-mundial-cream animate-pulse" />)}
+            </div>
+          ) : pendingStickers.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-2xl border-2 border-dashed border-mundial-purple/15 space-y-2">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-mundial-green/10 flex items-center justify-center">
+                <svg className="w-7 h-7 text-mundial-green/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p className="font-display text-base tracking-wider uppercase text-mundial-purple/50">Sin cromos pendientes</p>
+              <p className="text-sm text-mundial-purple/35">Todos los envíos fueron revisados.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {pendingStickers.map((s) => (
+                <div key={s.id} className="glass-card rounded-2xl p-4 space-y-3">
+                  <div className="flex items-start gap-4">
+                    <img src={s.image_url} alt="" className="w-16 h-20 object-contain rounded-xl border border-mundial-purple/10 bg-mundial-cream shrink-0" />
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <p className="font-display text-sm tracking-wide uppercase text-mundial-purple">
+                        {s.username}
+                      </p>
+                      <p className="text-xs text-mundial-purple/50">
+                        Slot {s.slotNumber}{s.slotLabel ? ` · ${s.slotLabel}` : ''}
+                      </p>
+                      <p className="text-xs text-mundial-purple/40">
+                        {new Date(s.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleApprove(s.id)}
+                        disabled={isReviewing}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-mundial-green hover:bg-mundial-green/90 disabled:opacity-60 text-white font-display text-xs tracking-wider uppercase rounded-xl transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                        Aprobar
+                      </button>
+                      <button
+                        onClick={() => { setRejectingId(s.id); setRejectReason('') }}
+                        disabled={isReviewing}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-mundial-cream hover:bg-mundial-red/10 disabled:opacity-60 text-mundial-red border-2 border-mundial-red/25 hover:border-mundial-red/50 font-display text-xs tracking-wider uppercase rounded-xl transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Rechazar
+                      </button>
+                    </div>
+                  </div>
+                  {/* Rejection form */}
+                  {rejectingId === s.id && (
+                    <div className="flex gap-2 pt-1 border-t border-mundial-purple/10">
+                      <input
+                        type="text"
+                        value={rejectReason}
+                        onChange={(e) => setRejectReason(e.target.value)}
+                        placeholder="Motivo del rechazo (obligatorio)"
+                        className="flex-1 px-3 py-2 text-sm rounded-xl border-2 border-mundial-red/30 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-red/60 transition-colors"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleReject(s.id)}
+                        disabled={!rejectReason.trim() || isReviewing}
+                        className="px-4 py-2 bg-mundial-red hover:bg-mundial-red/90 disabled:opacity-40 text-white font-display text-xs tracking-wider uppercase rounded-xl transition-colors"
+                      >
+                        {isReviewing ? '…' : 'Confirmar'}
+                      </button>
+                      <button
+                        onClick={() => { setRejectingId(null); setRejectReason('') }}
+                        className="px-3 py-2 text-mundial-purple/50 hover:text-mundial-purple rounded-xl transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}

@@ -97,3 +97,17 @@ export type Invitation = {
   uses_count: number
   created_at: string
 }
+
+export type StickerStatus = 'draft' | 'pending' | 'approved' | 'rejected'
+
+export type Sticker = {
+  id: string
+  album_id: string
+  slot_id: string
+  user_id: string
+  image_url: string
+  status: StickerStatus
+  rejection_reason: string | null
+  created_at: string
+  updated_at: string
+}

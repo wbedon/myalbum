@@ -112,6 +112,24 @@ export type Sticker = {
   updated_at: string
 }
 
+export type TradeOffer = {
+  id: string
+  album_id: string
+  offerer_id: string
+  collection_id: string
+  status: 'open' | 'matched' | 'cancelled'
+  created_at: string
+}
+
+export type TradeRequest = {
+  id: string
+  offer_id: string
+  requester_id: string
+  collection_id: string
+  status: 'pending' | 'accepted' | 'declined'
+  created_at: string
+}
+
 export type Pack = {
   id: string
   album_id: string

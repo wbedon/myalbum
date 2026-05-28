@@ -5,6 +5,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { supabase, type Album, type AlbumMember, type AlbumSlot, type Invitation, type Sticker } from '@/lib/supabase'
 import StickerEditor from './StickerEditor'
 import AlbumView from './AlbumView'
+import TradeView from './TradeView'
 
 interface Props {
   album: Album
@@ -14,7 +15,7 @@ interface Props {
   onBack: () => void
 }
 
-type Tab = 'participants' | 'slots' | 'invitations' | 'stickers' | 'review' | 'album'
+type Tab = 'participants' | 'slots' | 'invitations' | 'stickers' | 'review' | 'album' | 'trades'
 
 interface PendingStickerMeta extends Sticker {
   username?: string
@@ -383,12 +384,12 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
       {/* Tabs */}
       <div className="flex flex-wrap gap-1 bg-mundial-cream rounded-xl p-1 w-fit">
         {(isAdminView
-          ? ['participants', 'slots', 'invitations', 'stickers', 'review', 'album'] as Tab[]
-          : ['participants', 'slots', 'stickers', 'album'] as Tab[]
+          ? ['participants', 'slots', 'invitations', 'stickers', 'review', 'album', 'trades'] as Tab[]
+          : ['participants', 'slots', 'stickers', 'album', 'trades'] as Tab[]
         ).map((t) => {
           const labels: Record<Tab, string> = {
             participants: 'Participantes', slots: 'Slots', invitations: 'Invitaciones',
-            stickers: 'Mis Cromos', review: 'Revisión', album: 'Mi Álbum',
+            stickers: 'Mis Cromos', review: 'Revisión', album: 'Mi Álbum', trades: 'Intercambios',
           }
           return (
             <button
@@ -825,6 +826,15 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Tab: Intercambios ─────────────────────────────────────── */}
+      {tab === 'trades' && (
+        <TradeView
+          album={album}
+          currentUserId={currentUserId}
+          slots={slots}
+        />
       )}
 
       {/* ── Tab: Mi Álbum ─────────────────────────────────────────── */}

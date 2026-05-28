@@ -265,7 +265,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   }, [tab, myStickersFetched, fetchMyStickers])
 
   useEffect(() => {
-    if ((tab === 'stickers' || tab === 'review') && !slotsFetched) fetchSlots()
+    if ((tab === 'stickers' || tab === 'review' || tab === 'gallery' || tab === 'trades' || tab === 'album') && !slotsFetched) fetchSlots()
   }, [tab, slotsFetched, fetchSlots])
 
   useEffect(() => {

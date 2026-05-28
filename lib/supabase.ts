@@ -68,6 +68,7 @@ export type Album = {
   created_by: string | null
   created_at: string
   pack_size: number
+  is_public: boolean
 }
 
 export type AlbumMember = {

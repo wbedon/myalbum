@@ -35,6 +35,42 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   const [tabBadges, setTabBadges] = useState<TabBadgeCounts>({ stickers: 0, album: 0, trades: 0 })
   const [notifRefreshKey, setNotifRefreshKey] = useState(0)
 
+  // ── Compartir (vista pública) ─────────────────────────────────────
+  const [isPublic, setIsPublic]   = useState(album.is_public ?? false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [toggling, setToggling]   = useState(false)
+  const [copied, setCopied]       = useState(false)
+  const publicUrl = typeof window !== 'undefined' ? `${window.location.origin}/album/${album.id}` : ''
+
+  const handleTogglePublic = async () => {
+    setToggling(true)
+    const next = !isPublic
+    const { error } = await supabase
+      .from('albums')
+      .update({ is_public: next })
+      .eq('id', album.id)
+    if (!error) setIsPublic(next)
+    setToggling(false)
+  }
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(publicUrl).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  // Close share panel on outside click
+  useEffect(() => {
+    if (!shareOpen) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-share-panel]')) setShareOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [shareOpen])
+
   // ── Perfil de usuario ─────────────────────────────────────────────
   const [profileUserId, setProfileUserId] = useState<string | null>(null)
 
@@ -412,6 +448,84 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
             refreshKey={notifRefreshKey}
             onTabBadge={setTabBadges}
           />
+          {/* Share button — admin only */}
+          {isAdminView && (
+            <div className="relative" data-share-panel>
+              <button
+                onClick={() => setShareOpen((o) => !o)}
+                title={isPublic ? 'Álbum público' : 'Compartir álbum'}
+                className={[
+                  'w-10 h-10 rounded-xl flex items-center justify-center transition-colors',
+                  isPublic
+                    ? 'bg-mundial-green/15 text-mundial-green border border-mundial-green/30'
+                    : 'bg-mundial-cream hover:bg-mundial-purple/8 text-mundial-purple/50',
+                ].join(' ')}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+                </svg>
+              </button>
+
+              {shareOpen && (
+                <div className="absolute right-0 top-12 z-30 w-80 glass-card rounded-2xl shadow-xl border border-mundial-purple/10 p-4 space-y-4 animate-fade-in">
+                  {/* Status toggle */}
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-display text-sm tracking-wider uppercase text-mundial-purple">
+                        Vista pública
+                      </p>
+                      <p className="text-xs text-mundial-purple/50 mt-0.5">
+                        {isPublic
+                          ? 'Cualquiera con el link puede ver este álbum'
+                          : 'Solo los participantes pueden ver este álbum'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleTogglePublic}
+                      disabled={toggling}
+                      className={[
+                        'relative w-11 h-6 rounded-full transition-colors shrink-0',
+                        isPublic ? 'bg-mundial-green' : 'bg-mundial-purple/20',
+                        toggling ? 'opacity-50' : '',
+                      ].join(' ')}
+                    >
+                      <span className={[
+                        'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform',
+                        isPublic ? 'translate-x-5' : 'translate-x-0.5',
+                      ].join(' ')} />
+                    </button>
+                  </div>
+
+                  {/* Public URL */}
+                  {isPublic && (
+                    <div className="space-y-2">
+                      <p className="font-condensed text-[10px] font-bold tracking-[0.3em] uppercase text-mundial-purple/40">
+                        Link público
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          readOnly
+                          value={publicUrl}
+                          className="flex-1 min-w-0 text-xs px-3 py-2 rounded-lg bg-mundial-cream border border-mundial-purple/15 text-mundial-purple/70 font-mono truncate"
+                        />
+                        <button
+                          onClick={handleCopyLink}
+                          className={[
+                            'shrink-0 px-3 py-2 rounded-lg text-xs font-condensed font-bold tracking-wider uppercase transition-colors',
+                            copied
+                              ? 'bg-mundial-green text-white'
+                              : 'bg-mundial-purple text-white hover:bg-mundial-purple/90',
+                          ].join(' ')}
+                        >
+                          {copied ? '✓ Copiado' : 'Copiar'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

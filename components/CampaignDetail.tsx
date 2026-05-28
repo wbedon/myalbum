@@ -240,8 +240,8 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
       .eq('album_id', album.id)
       .eq('status', 'pending')
     if (!data || data.length === 0) { setPendingStickers([]); setPendingFetched(true); return }
-    const userIds = [...new Set((data as Sticker[]).map((s) => s.user_id))]
-    const slotIds = [...new Set((data as Sticker[]).map((s) => s.slot_id))]
+    const userIds = Array.from(new Set((data as Sticker[]).map((s) => s.user_id)))
+    const slotIds = Array.from(new Set((data as Sticker[]).map((s) => s.slot_id)))
     const [{ data: profiles }, { data: slotsData }] = await Promise.all([
       supabase.from('profiles').select('user_id, username').in('user_id', userIds),
       supabase.from('album_slots').select('id, slot_number, label').in('id', slotIds),

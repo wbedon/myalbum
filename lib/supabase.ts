@@ -147,3 +147,20 @@ export type CollectionItem = {
   pack_id: string | null
   created_at: string
 }
+
+export type NotificationType =
+  | 'sticker_approved'
+  | 'sticker_rejected'
+  | 'trade_requested'
+  | 'trade_accepted'
+  | 'pack_available'
+
+export type Notification = {
+  id: string
+  user_id: string
+  album_id: string
+  type: NotificationType
+  payload: Record<string, unknown>
+  read: boolean
+  created_at: string
+}

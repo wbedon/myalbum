@@ -7,6 +7,7 @@ import StickerEditor from './StickerEditor'
 import AlbumView from './AlbumView'
 import TradeView from './TradeView'
 import GalleryView from './GalleryView'
+import NotificationsPanel, { type TabBadgeCounts } from './NotificationsPanel'
 
 interface Props {
   album: Album
@@ -27,6 +28,10 @@ interface PendingStickerMeta extends Sticker {
 export default function CampaignDetail({ album, currentUserId, canAssignAdmin, userRole, onBack }: Props) {
   const isAdminView = canAssignAdmin || userRole === 'admin'
   const [tab, setTab] = useState<Tab>('participants')
+
+  // ── Notificaciones ────────────────────────────────────────────────
+  const [tabBadges, setTabBadges] = useState<TabBadgeCounts>({ stickers: 0, album: 0, trades: 0 })
+  const [notifRefreshKey, setNotifRefreshKey] = useState(0)
 
   // ── Participantes ─────────────────────────────────────────────────
   const [members, setMembers] = useState<AlbumMember[]>([])
@@ -348,6 +353,24 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
     return `Expira el ${new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}`
   }
 
+  // Auto-mark notifications as read when switching to the relevant tab
+  useEffect(() => {
+    const typesForTab: Partial<Record<Tab, string[]>> = {
+      stickers: ['sticker_approved', 'sticker_rejected'],
+      album:    ['pack_available'],
+      trades:   ['trade_requested', 'trade_accepted'],
+    }
+    const types = typesForTab[tab]
+    if (!types) return
+    supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('album_id', album.id)
+      .in('type', types)
+      .eq('read', false)
+      .then(() => setNotifRefreshKey((k) => k + 1))
+  }, [tab, album.id])
+
   const admins = members.filter((m) => m.role === 'admin')
   const regulars = members.filter((m) => m.role === 'member')
 
@@ -366,7 +389,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
         </button>
         <div className="flex items-center gap-3">
           <div className="w-1.5 h-8 bg-mundial-yellow rounded-full" />
-          <div>
+          <div className="flex-1 min-w-0">
             <h2 className="font-display text-2xl sm:text-3xl tracking-wide uppercase text-mundial-purple leading-tight">
               {album.name}
             </h2>
@@ -379,6 +402,11 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
               </span>
             </div>
           </div>
+          <NotificationsPanel
+            albumId={album.id}
+            refreshKey={notifRefreshKey}
+            onTabBadge={setTabBadges}
+          />
         </div>
       </div>
 
@@ -393,18 +421,25 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
             stickers: 'Mis Cromos', review: 'Revisión', album: 'Mi Álbum',
             gallery: 'Galería', trades: 'Intercambios',
           }
+          const badgeCount =
+            t === 'stickers' ? tabBadges.stickers :
+            t === 'album'    ? tabBadges.album    :
+            t === 'trades'   ? tabBadges.trades   : 0
           return (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={[
-                'px-4 py-2 rounded-lg text-xs font-condensed font-bold tracking-wider uppercase transition-all',
+                'relative px-4 py-2 rounded-lg text-xs font-condensed font-bold tracking-wider uppercase transition-all',
                 tab === t
                   ? 'bg-white text-mundial-purple shadow-sm'
                   : 'text-mundial-purple/50 hover:text-mundial-purple',
               ].join(' ')}
             >
               {labels[t]}
+              {badgeCount > 0 && tab !== t && (
+                <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-red-500" />
+              )}
             </button>
           )
         })}

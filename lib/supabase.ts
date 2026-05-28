@@ -148,6 +148,22 @@ export type CollectionItem = {
   created_at: string
 }
 
+export type AchievementType =
+  | 'first_sticker_submitted'
+  | 'first_sticker_approved'
+  | 'sticker_approved_5'
+  | 'first_pack_opened'
+  | 'first_card_collected'
+  | 'collector_10'
+  | 'first_trade'
+  | 'trader_5'
+  | 'album_complete'
+
+export type Achievement = {
+  type: AchievementType
+  earned_at: string
+}
+
 export type NotificationType =
   | 'sticker_approved'
   | 'sticker_rejected'

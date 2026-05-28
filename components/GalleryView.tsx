@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, type Album, type AlbumSlot, type AlbumMember } from '@/lib/supabase'
+import Avatar from './Avatar'
+import UserProfileModal from './UserProfileModal'
 
 interface ApprovedSticker {
   id: string
@@ -21,8 +23,8 @@ interface Props {
 export default function GalleryView({ album, currentUserId, slots, members }: Props) {
   const [loading, setLoading]               = useState(true)
   const [stickers, setStickers]             = useState<ApprovedSticker[]>([])
-  // user_id → Set of slot_ids they have in their collection
   const [userSlots, setUserSlots]           = useState<Map<string, Set<string>>>(new Map())
+  const [profileUserId, setProfileUserId]   = useState<string | null>(null)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
@@ -206,6 +208,14 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
       </section>
 
       {/* ── Ranking ───────────────────────────────────────────── */}
+      {profileUserId && (
+        <UserProfileModal
+          userId={profileUserId}
+          currentUserId={currentUserId}
+          onClose={() => setProfileUserId(null)}
+        />
+      )}
+
       {members.length > 0 && slots.length > 0 && (
         <section className="space-y-3">
           <h3 className="font-condensed text-[11px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
@@ -238,22 +248,22 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                   </div>
 
                   {/* Avatar */}
-                  <div className={[
-                    'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0',
-                    isMe ? 'bg-mundial-yellow/40 text-mundial-purple' : 'bg-mundial-purple/10 text-mundial-purple',
-                  ].join(' ')}>
-                    {((m.username ?? '?')[0]).toUpperCase()}
-                  </div>
+                  <button onClick={() => setProfileUserId(m.user_id)} className="hover:opacity-80 transition-opacity shrink-0">
+                    <Avatar username={m.username ?? '?'} size="sm" />
+                  </button>
 
                   {/* Name + bar */}
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center gap-2">
-                      <p className={[
-                        'font-display text-sm tracking-wider uppercase truncate',
-                        isMe ? 'text-mundial-purple font-bold' : 'text-mundial-purple',
-                      ].join(' ')}>
+                      <button
+                        onClick={() => setProfileUserId(m.user_id)}
+                        className={[
+                          'font-display text-sm tracking-wider uppercase truncate hover:underline',
+                          isMe ? 'text-mundial-purple font-bold' : 'text-mundial-purple',
+                        ].join(' ')}
+                      >
                         {isMe ? `${m.username} (tú)` : m.username}
-                      </p>
+                      </button>
                       {m.role === 'admin' && (
                         <span className="text-[9px] font-condensed font-bold tracking-[0.2em] uppercase text-mundial-yellow-dark bg-mundial-yellow/30 px-1.5 py-0.5 rounded-full shrink-0">
                           Org

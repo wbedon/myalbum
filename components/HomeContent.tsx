@@ -9,6 +9,8 @@ import AdminPanel from './AdminPanel'
 import MyAlbumsPanel from './MyAlbumsPanel'
 import HeroSection from './HeroSection'
 import { FlagUSA, FlagMexico, FlagCanada } from './MundialDecor'
+import Avatar from './Avatar'
+import UserProfileModal from './UserProfileModal'
 import { supabase } from '@/lib/supabase'
 import type { Photo } from '@/lib/supabase'
 
@@ -24,7 +26,12 @@ export default function HomeContent({ user, onLogout }: Props) {
   const [hasCampaigns, setHasCampaigns] = useState(false)
   const [showAdmin, setShowAdmin] = useState(false)
   const [showMyCampaigns, setShowMyCampaigns] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
   const uploaderRef = useRef<HTMLDivElement>(null)
+
+  const username: string = (user.user_metadata?.username as string | undefined)
+    ?? user.email?.replace('@myalbum.internal', '')
+    ?? user.id.slice(0, 8)
 
   useEffect(() => {
     supabase
@@ -119,9 +126,17 @@ export default function HomeContent({ user, onLogout }: Props) {
                   {showAdmin ? 'Mi App' : 'Admin'}
                 </button>
               )}
-              <span className="hidden sm:inline-block text-[10px] text-white/50 font-condensed tracking-wide max-w-[140px] truncate">
-                {(user.user_metadata?.username as string | undefined) ?? user.email?.replace('@myalbum.internal', '')}
-              </span>
+              {/* Avatar / Mi Perfil */}
+              <button
+                onClick={() => setShowProfile(true)}
+                className="flex items-center gap-2 px-2 py-1 rounded-full hover:bg-white/10 transition-colors group"
+                title="Mi perfil"
+              >
+                <Avatar username={username} size="xs" />
+                <span className="hidden sm:inline-block text-[10px] text-white/60 group-hover:text-white/90 font-condensed tracking-wide max-w-[120px] truncate transition-colors">
+                  {username}
+                </span>
+              </button>
               <button
                 onClick={onLogout}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-xs font-condensed tracking-wider uppercase transition-colors"
@@ -294,6 +309,14 @@ export default function HomeContent({ user, onLogout }: Props) {
           </div>
         </div>
       </footer>
+
+      {showProfile && (
+        <UserProfileModal
+          userId={user.id}
+          currentUserId={user.id}
+          onClose={() => setShowProfile(false)}
+        />
+      )}
     </div>
   )
 }

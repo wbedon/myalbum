@@ -64,6 +64,10 @@ const config: Config = {
           '0%, 100%': { transform: 'scale(1.05)' },
           '50%': { transform: 'scale(1.12)' },
         },
+        'fade-in': {
+          '0%': { opacity: '0', transform: 'scale(0.97) translateY(6px)' },
+          '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
+        },
       },
       animation: {
         'float-up': 'float-up 12s linear infinite',
@@ -72,6 +76,7 @@ const config: Config = {
         'fade-up': 'fade-up 700ms ease-out both',
         'scale-in': 'scale-in 800ms ease-out both',
         'slow-zoom': 'slow-zoom 20s ease-in-out infinite',
+        'fade-in': 'fade-in 200ms ease-out both',
       },
     },
   },

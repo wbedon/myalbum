@@ -8,6 +8,8 @@ import AlbumView from './AlbumView'
 import TradeView from './TradeView'
 import GalleryView from './GalleryView'
 import NotificationsPanel, { type TabBadgeCounts } from './NotificationsPanel'
+import Avatar from './Avatar'
+import UserProfileModal from './UserProfileModal'
 
 interface Props {
   album: Album
@@ -32,6 +34,9 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   // ── Notificaciones ────────────────────────────────────────────────
   const [tabBadges, setTabBadges] = useState<TabBadgeCounts>({ stickers: 0, album: 0, trades: 0 })
   const [notifRefreshKey, setNotifRefreshKey] = useState(0)
+
+  // ── Perfil de usuario ─────────────────────────────────────────────
+  const [profileUserId, setProfileUserId] = useState<string | null>(null)
 
   // ── Participantes ─────────────────────────────────────────────────
   const [members, setMembers] = useState<AlbumMember[]>([])
@@ -465,10 +470,13 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                   <div className="flex flex-wrap gap-2">
                     {admins.map((m) => (
                       <div key={m.user_id} className="flex items-center gap-2 px-3 py-1.5 bg-mundial-yellow/20 border border-mundial-yellow/50 rounded-xl">
-                        <div className="w-6 h-6 rounded-full bg-mundial-yellow/50 flex items-center justify-center text-[10px] font-bold text-mundial-purple">
-                          {(m.username ?? '?')[0].toUpperCase()}
-                        </div>
-                        <span className="font-display text-sm tracking-wider text-mundial-purple">{m.username}</span>
+                        <button
+                          onClick={() => setProfileUserId(m.user_id)}
+                          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                        >
+                          <Avatar username={m.username ?? '?'} size="xs" />
+                          <span className="font-display text-sm tracking-wider text-mundial-purple">{m.username}</span>
+                        </button>
                         <span className="text-[9px] font-condensed font-bold tracking-[0.2em] uppercase text-mundial-yellow-dark bg-mundial-yellow/40 px-1.5 py-0.5 rounded-full">
                           Org
                         </span>
@@ -520,10 +528,13 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                   <div className="grid gap-2">
                     {regulars.map((m) => (
                       <div key={m.user_id} className="flex items-center gap-3 px-4 py-3 bg-white/60 rounded-xl group">
-                        <div className="w-8 h-8 rounded-full bg-mundial-purple/10 flex items-center justify-center text-sm font-bold text-mundial-purple">
-                          {(m.username ?? '?')[0].toUpperCase()}
-                        </div>
-                        <span className="flex-1 font-display text-sm tracking-wider text-mundial-purple">{m.username}</span>
+                        <button
+                          onClick={() => setProfileUserId(m.user_id)}
+                          className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
+                        >
+                          <Avatar username={m.username ?? '?'} size="sm" />
+                          <span className="font-display text-sm tracking-wider text-mundial-purple truncate">{m.username}</span>
+                        </button>
                         {isAdminView && (
                           <button
                             onClick={() => handleRemoveMember(m.user_id)}
@@ -892,6 +903,15 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
           isAdminView={isAdminView}
           slots={slots}
           members={members}
+        />
+      )}
+
+      {/* ── Perfil de usuario ────────────────────────────────────────── */}
+      {profileUserId && (
+        <UserProfileModal
+          userId={profileUserId}
+          currentUserId={currentUserId}
+          onClose={() => setProfileUserId(null)}
         />
       )}
 

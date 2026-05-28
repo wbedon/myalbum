@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase, type Album, type AlbumMember, type AlbumSlot, type Invitation, type Sticker } from '@/lib/supabase'
 import StickerEditor from './StickerEditor'
+import AlbumView from './AlbumView'
 
 interface Props {
   album: Album
@@ -13,7 +14,7 @@ interface Props {
   onBack: () => void
 }
 
-type Tab = 'participants' | 'slots' | 'invitations' | 'stickers' | 'review'
+type Tab = 'participants' | 'slots' | 'invitations' | 'stickers' | 'review' | 'album'
 
 interface PendingStickerMeta extends Sticker {
   username?: string
@@ -382,12 +383,12 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
       {/* Tabs */}
       <div className="flex flex-wrap gap-1 bg-mundial-cream rounded-xl p-1 w-fit">
         {(isAdminView
-          ? ['participants', 'slots', 'invitations', 'stickers', 'review'] as Tab[]
-          : ['participants', 'slots', 'stickers'] as Tab[]
+          ? ['participants', 'slots', 'invitations', 'stickers', 'review', 'album'] as Tab[]
+          : ['participants', 'slots', 'stickers', 'album'] as Tab[]
         ).map((t) => {
           const labels: Record<Tab, string> = {
             participants: 'Participantes', slots: 'Slots', invitations: 'Invitaciones',
-            stickers: 'Mis Cromos', review: 'Revisión',
+            stickers: 'Mis Cromos', review: 'Revisión', album: 'Mi Álbum',
           }
           return (
             <button
@@ -824,6 +825,17 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Tab: Mi Álbum ─────────────────────────────────────────── */}
+      {tab === 'album' && (
+        <AlbumView
+          album={album}
+          currentUserId={currentUserId}
+          isAdminView={isAdminView}
+          slots={slots}
+          members={members}
+        />
       )}
 
       {/* ── Tab: Invitaciones ──────────────────────────────────────── */}

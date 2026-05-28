@@ -111,3 +111,21 @@ export type Sticker = {
   created_at: string
   updated_at: string
 }
+
+export type Pack = {
+  id: string
+  album_id: string
+  user_id: string
+  status: 'sealed' | 'opened'
+  opened_at: string | null
+  created_at: string
+}
+
+export type CollectionItem = {
+  id: string
+  album_id: string
+  user_id: string
+  sticker_id: string
+  pack_id: string | null
+  created_at: string
+}

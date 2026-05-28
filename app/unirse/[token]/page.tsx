@@ -44,46 +44,57 @@ export default function JoinPage({ params }: { params: { token: string } }) {
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  // Fetch invitation
+  // Fetch invitation + album in two separate queries (join via fk not reliable)
   useEffect(() => {
-    supabase
-      .from('invitations')
-      .select('album_id, expires_at, max_uses, uses_count, albums(name, description)')
-      .eq('token', token)
-      .single()
-      .then(({ data, error }: { data: unknown; error: unknown }) => {
-        if (error || !data) {
-          setStatus('invalid')
-          setErrorMsg('Esta invitación no existe o fue eliminada.')
-          return
-        }
-        const row = data as {
-          album_id: string
-          expires_at: string | null
-          max_uses: number | null
-          uses_count: number
-          albums: { name: string; description: string | null } | null
-        }
-        if (row.expires_at && new Date(row.expires_at) < new Date()) {
-          setStatus('invalid')
-          setErrorMsg('Esta invitación expiró.')
-          return
-        }
-        if (row.max_uses !== null && row.uses_count >= row.max_uses) {
-          setStatus('invalid')
-          setErrorMsg('Esta invitación alcanzó el límite de usos.')
-          return
-        }
-        setInfo({
-          album_id: row.album_id,
-          expires_at: row.expires_at,
-          max_uses: row.max_uses,
-          uses_count: row.uses_count,
-          campaign_name: row.albums?.name ?? 'Campaña',
-          campaign_description: row.albums?.description ?? null,
-        })
-        setStatus('valid')
+    const load = async () => {
+      const { data: inv, error: invErr } = await supabase
+        .from('invitations')
+        .select('album_id, expires_at, max_uses, uses_count')
+        .eq('token', token)
+        .single()
+
+      if (invErr || !inv) {
+        setStatus('invalid')
+        setErrorMsg('Esta invitación no existe o fue eliminada.')
+        return
+      }
+
+      const row = inv as {
+        album_id: string
+        expires_at: string | null
+        max_uses: number | null
+        uses_count: number
+      }
+
+      if (row.expires_at && new Date(row.expires_at) < new Date()) {
+        setStatus('invalid')
+        setErrorMsg('Esta invitación expiró.')
+        return
+      }
+      if (row.max_uses !== null && row.uses_count >= row.max_uses) {
+        setStatus('invalid')
+        setErrorMsg('Esta invitación alcanzó el límite de usos.')
+        return
+      }
+
+      const { data: album } = await supabase
+        .from('albums')
+        .select('name, description')
+        .eq('id', row.album_id)
+        .single()
+
+      const a = album as { name: string; description: string | null } | null
+      setInfo({
+        album_id: row.album_id,
+        expires_at: row.expires_at,
+        max_uses: row.max_uses,
+        uses_count: row.uses_count,
+        campaign_name: a?.name ?? 'Campaña',
+        campaign_description: a?.description ?? null,
       })
+      setStatus('valid')
+    }
+    load()
   }, [token])
 
   const handleJoin = async () => {

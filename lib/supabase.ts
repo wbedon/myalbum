@@ -148,6 +148,17 @@ export type CollectionItem = {
   created_at: string
 }
 
+export type ReactionEmoji = '❤️' | '🔥' | '⭐' | '😂'
+
+export type StickerReaction = {
+  id: string
+  user_id: string
+  sticker_id: string
+  album_id: string
+  emoji: ReactionEmoji
+  created_at: string
+}
+
 export type AchievementType =
   | 'first_sticker_submitted'
   | 'first_sticker_approved'

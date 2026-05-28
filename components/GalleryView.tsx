@@ -5,6 +5,12 @@ import { supabase, type Album, type AlbumSlot, type AlbumMember } from '@/lib/su
 import Avatar from './Avatar'
 import UserProfileModal from './UserProfileModal'
 
+const EMOJIS = ['❤️', '🔥', '⭐', '😂'] as const
+type Emoji = typeof EMOJIS[number]
+
+// sticker_id → emoji → Set<user_id>
+type ReactMap = Map<string, Map<string, Set<string>>>
+
 interface ApprovedSticker {
   id: string
   image_url: string
@@ -21,22 +27,24 @@ interface Props {
 }
 
 export default function GalleryView({ album, currentUserId, slots, members }: Props) {
-  const [loading, setLoading]               = useState(true)
-  const [stickers, setStickers]             = useState<ApprovedSticker[]>([])
-  const [userSlots, setUserSlots]           = useState<Map<string, Set<string>>>(new Map())
-  const [profileUserId, setProfileUserId]   = useState<string | null>(null)
+  const [loading, setLoading]             = useState(true)
+  const [stickers, setStickers]           = useState<ApprovedSticker[]>([])
+  const [userSlots, setUserSlots]         = useState<Map<string, Set<string>>>(new Map())
+  const [reactions, setReactions]         = useState<ReactMap>(new Map())
+  const [profileUserId, setProfileUserId] = useState<string | null>(null)
+  const [toggling, setToggling]           = useState<string | null>(null) // sticker_id+emoji key
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
 
-    // All approved stickers for this album
+    // Approved stickers
     const { data: stickersRaw } = await supabase
       .from('stickers')
       .select('id, image_url, slot_id, user_id')
       .eq('album_id', album.id)
       .eq('status', 'approved')
 
-    // Profiles for creators
+    // Creator profiles
     const creatorIds = Array.from(new Set((stickersRaw ?? []).map((s: { user_id: string }) => s.user_id)))
     const { data: profilesRaw } = creatorIds.length > 0
       ? await supabase.from('profiles').select('user_id, username').in('user_id', creatorIds)
@@ -47,15 +55,15 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
 
     const parsed: ApprovedSticker[] = (stickersRaw ?? []).map(
       (s: { id: string; image_url: string; slot_id: string; user_id: string }) => ({
-        id:         s.id,
-        image_url:  s.image_url,
-        slot_id:    s.slot_id,
-        user_id:    s.user_id,
-        username:   (profileMap.get(s.user_id) ?? s.user_id.slice(0, 8)) as string,
+        id:        s.id,
+        image_url: s.image_url,
+        slot_id:   s.slot_id,
+        user_id:   s.user_id,
+        username:  (profileMap.get(s.user_id) ?? s.user_id.slice(0, 8)) as string,
       })
     )
 
-    // Collection items for leaderboard — group by user, count unique slots
+    // Collection for leaderboard
     const { data: collRaw } = await supabase
       .from('collection')
       .select('user_id, sticker_id')
@@ -70,12 +78,66 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
       us.get(c.user_id)!.add(slotId)
     })
 
+    // Reactions
+    const { data: rxRaw } = await supabase
+      .from('sticker_reactions')
+      .select('sticker_id, user_id, emoji')
+      .eq('album_id', album.id)
+
+    const rx: ReactMap = new Map()
+    for (const r of (rxRaw ?? []) as { sticker_id: string; user_id: string; emoji: string }[]) {
+      if (!rx.has(r.sticker_id)) rx.set(r.sticker_id, new Map())
+      const byEmoji = rx.get(r.sticker_id)!
+      if (!byEmoji.has(r.emoji)) byEmoji.set(r.emoji, new Set())
+      byEmoji.get(r.emoji)!.add(r.user_id)
+    }
+
     setStickers(parsed)
     setUserSlots(us)
+    setReactions(rx)
     setLoading(false)
   }, [album.id])
 
   useEffect(() => { fetchAll() }, [fetchAll])
+
+  async function handleToggle(stickerId: string, emoji: Emoji) {
+    const key = `${stickerId}:${emoji}`
+    if (toggling === key) return
+    setToggling(key)
+
+    // Optimistic update
+    setReactions((prev) => {
+      const next = new Map(prev)
+      const byEmoji = new Map(next.get(stickerId) ?? [])
+      const users   = new Set(byEmoji.get(emoji) ?? [])
+      if (users.has(currentUserId)) users.delete(currentUserId)
+      else users.add(currentUserId)
+      byEmoji.set(emoji, users)
+      next.set(stickerId, byEmoji)
+      return next
+    })
+
+    const { error } = await supabase.rpc('toggle_reaction', {
+      p_sticker_id: stickerId,
+      p_emoji:      emoji,
+    })
+
+    // Revert if error
+    if (error) {
+      setReactions((prev) => {
+        const next = new Map(prev)
+        const byEmoji = new Map(next.get(stickerId) ?? [])
+        const users   = new Set(byEmoji.get(emoji) ?? [])
+        if (users.has(currentUserId)) users.delete(currentUserId)
+        else users.add(currentUserId)
+        byEmoji.set(emoji, users)
+        next.set(stickerId, byEmoji)
+        return next
+      })
+    }
+
+    setToggling(null)
+  }
 
   // ── Derived ──────────────────────────────────────────────────────
   const bySlot = new Map<string, ApprovedSticker[]>()
@@ -88,10 +150,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
   const totalApproved = stickers.length
 
   const leaderboard = [...members]
-    .map((m) => ({
-      ...m,
-      completed: userSlots.get(m.user_id)?.size ?? 0,
-    }))
+    .map((m) => ({ ...m, completed: userSlots.get(m.user_id)?.size ?? 0 }))
     .sort((a, b) => b.completed - a.completed || (a.username ?? '').localeCompare(b.username ?? ''))
 
   const myRank = leaderboard.findIndex((m) => m.user_id === currentUserId) + 1
@@ -108,7 +167,16 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
   return (
     <div className="space-y-8">
 
-      {/* ── Banner ────────────────────────────────────────────── */}
+      {/* ── Perfil modal ─────────────────────────────────────────── */}
+      {profileUserId && (
+        <UserProfileModal
+          userId={profileUserId}
+          currentUserId={currentUserId}
+          onClose={() => setProfileUserId(null)}
+        />
+      )}
+
+      {/* ── Banners ──────────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-3">
         <div className="flex items-center gap-2.5 px-4 py-3 bg-mundial-yellow/15 border border-mundial-yellow/40 rounded-2xl">
           <svg className="w-4 h-4 text-mundial-yellow-dark shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -133,7 +201,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
         )}
       </div>
 
-      {/* ── Galería por slot ──────────────────────────────────── */}
+      {/* ── Galería por slot ──────────────────────────────────────── */}
       <section className="space-y-4">
         <h3 className="font-condensed text-[11px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
           Galería
@@ -165,7 +233,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                     </span>
                   </div>
 
-                  {/* Sticker row */}
+                  {/* Sticker cards */}
                   {items.length === 0 ? (
                     <div className="px-4 py-5 text-center">
                       <p className="text-xs text-mundial-purple/30 font-condensed font-bold tracking-wider uppercase">
@@ -174,29 +242,71 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                     </div>
                   ) : (
                     <div className="p-4">
-                      <div className="flex gap-3 flex-wrap">
-                        {items.map((s) => (
-                          <div key={s.id} className="flex flex-col items-center gap-1.5 group">
-                            <div className={[
-                              'w-16 h-20 rounded-xl overflow-hidden border-2 transition-all duration-200 group-hover:scale-105',
-                              s.user_id === currentUserId
-                                ? 'border-mundial-yellow shadow-md'
-                                : 'border-mundial-purple/10',
-                            ].join(' ')}>
-                              <img
-                                src={s.image_url}
-                                alt={`${s.username} · slot ${slot.slot_number}`}
-                                className="w-full h-full object-contain bg-mundial-cream"
-                              />
+                      <div className="flex gap-4 flex-wrap">
+                        {items.map((s) => {
+                          const isMe = s.user_id === currentUserId
+                          const sxReactions = reactions.get(s.id)
+
+                          return (
+                            <div key={s.id} className="flex flex-col items-center gap-1.5 group">
+                              {/* Sticker image */}
+                              <div className={[
+                                'w-20 h-[100px] rounded-xl overflow-hidden border-2 transition-all duration-200 group-hover:scale-105 cursor-pointer',
+                                isMe
+                                  ? 'border-mundial-yellow shadow-md'
+                                  : 'border-mundial-purple/10',
+                              ].join(' ')}
+                                onClick={() => setProfileUserId(s.user_id)}
+                              >
+                                <img
+                                  src={s.image_url}
+                                  alt={`${s.username} · slot ${slot.slot_number}`}
+                                  className="w-full h-full object-contain bg-mundial-cream"
+                                />
+                              </div>
+
+                              {/* Creator name */}
+                              <button
+                                onClick={() => setProfileUserId(s.user_id)}
+                                className={[
+                                  'text-[10px] font-condensed font-bold tracking-wider uppercase max-w-[80px] truncate text-center hover:underline',
+                                  isMe ? 'text-mundial-yellow-dark' : 'text-mundial-purple/50',
+                                ].join(' ')}
+                              >
+                                {isMe ? 'Tú' : s.username}
+                              </button>
+
+                              {/* Reaction bar */}
+                              <div className="flex items-center gap-0.5">
+                                {EMOJIS.map((emoji) => {
+                                  const count   = sxReactions?.get(emoji)?.size ?? 0
+                                  const reacted = sxReactions?.get(emoji)?.has(currentUserId) ?? false
+                                  const isActive = toggling === `${s.id}:${emoji}`
+                                  return (
+                                    <button
+                                      key={emoji}
+                                      onClick={() => handleToggle(s.id, emoji)}
+                                      disabled={isActive}
+                                      title={emoji}
+                                      className={[
+                                        'flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[10px] transition-all leading-none',
+                                        reacted
+                                          ? 'bg-mundial-yellow/30 text-mundial-purple scale-110'
+                                          : 'hover:bg-mundial-purple/8 text-mundial-purple/40 hover:text-mundial-purple',
+                                        count === 0 && !reacted ? 'opacity-40' : '',
+                                      ].join(' ')}
+                                    >
+                                      <span className="text-[11px]">{emoji}</span>
+                                      {count > 0 && (
+                                        <span className="font-condensed font-bold text-[9px]">{count}</span>
+                                      )}
+                                    </button>
+                                  )
+                                })}
+                              </div>
                             </div>
-                            <p className={[
-                              'text-[10px] font-condensed font-bold tracking-wider uppercase max-w-[64px] truncate text-center',
-                              s.user_id === currentUserId ? 'text-mundial-yellow-dark' : 'text-mundial-purple/50',
-                            ].join(' ')}>
-                              {s.user_id === currentUserId ? 'Tú' : s.username}
-                            </p>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
                   )}
@@ -207,15 +317,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
         )}
       </section>
 
-      {/* ── Ranking ───────────────────────────────────────────── */}
-      {profileUserId && (
-        <UserProfileModal
-          userId={profileUserId}
-          currentUserId={currentUserId}
-          onClose={() => setProfileUserId(null)}
-        />
-      )}
-
+      {/* ── Ranking ───────────────────────────────────────────────── */}
       {members.length > 0 && slots.length > 0 && (
         <section className="space-y-3">
           <h3 className="font-condensed text-[11px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
@@ -223,16 +325,13 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
           </h3>
           <div className="glass-card rounded-2xl overflow-hidden divide-y divide-mundial-purple/8">
             {leaderboard.map((m, idx) => {
-              const pct       = slots.length > 0 ? (m.completed / slots.length) * 100 : 0
-              const isMe      = m.user_id === currentUserId
-              const isFirst   = idx === 0 && m.completed > 0
+              const pct     = slots.length > 0 ? (m.completed / slots.length) * 100 : 0
+              const isMe    = m.user_id === currentUserId
+              const isFirst = idx === 0 && m.completed > 0
               return (
                 <div
                   key={m.user_id}
-                  className={[
-                    'flex items-center gap-4 px-5 py-3.5',
-                    isMe ? 'bg-mundial-yellow/8' : '',
-                  ].join(' ')}
+                  className={['flex items-center gap-4 px-5 py-3.5', isMe ? 'bg-mundial-yellow/8' : ''].join(' ')}
                 >
                   {/* Rank */}
                   <div className="w-7 text-center shrink-0">

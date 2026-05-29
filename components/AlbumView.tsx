@@ -142,6 +142,60 @@ export default function AlbumView({ album, currentUserId, isAdminView, slots, me
     setOpeningPackId(null)
   }
 
+  // ── Export PDF ────────────────────────────────────────────────
+  const handleExportPdf = useCallback(() => {
+    const esc = (s?: string | null) =>
+      (s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+    const today = new Date().toLocaleDateString('es', { day: '2-digit', month: 'long', year: 'numeric' })
+    const bySl = new Map<string, CollectionItemMeta[]>()
+    collection.forEach((c) => { if (!bySl.has(c.slot_id)) bySl.set(c.slot_id, []); bySl.get(c.slot_id)!.push(c) })
+    const collected = new Set(collection.map((c) => c.slot_id)).size
+
+    const gridHtml = slots.map((slot) => {
+      const first = bySl.get(slot.id)?.[0]
+      const imgHtml = first
+        ? `<img src="${esc(first.image_url)}" />`
+        : `<div class="empty"><div class="num">${slot.slot_number}</div><div class="hint">Pegar aquí</div></div>`
+      return `<div class="slot"><div class="img-area">${imgHtml}</div><div class="lbl">#${slot.slot_number}${slot.label ? ' ' + esc(slot.label) : ''}</div></div>`
+    }).join('')
+
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<title>${esc(album.name)}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+@page{size:A4 portrait;margin:12mm}
+body{font-family:Arial,sans-serif;background:#fff;color:#3D2761}
+.header{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:4mm;border-bottom:2px solid #3D2761;margin-bottom:6mm}
+.title{font-size:18pt;text-transform:uppercase;letter-spacing:2px;font-weight:bold}
+.meta{font-size:9pt;color:#888;margin-top:2mm}
+.url{font-size:8pt;color:#aaa;align-self:flex-end}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:3mm}
+.slot{border:1px solid #e0d8f0;border-radius:2mm;overflow:hidden;break-inside:avoid}
+.img-area{aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;background:#faf4e0}
+.img-area img{width:100%;height:100%;object-fit:contain;display:block}
+.empty{text-align:center;padding:2mm}
+.num{font-size:18pt;color:#d0c8e0;font-weight:bold}
+.hint{font-size:6pt;color:#c0b8d0;text-transform:uppercase;letter-spacing:1px;margin-top:1mm}
+.lbl{padding:1.5mm 2mm;border-top:1px solid #e8e0f0;background:#fff;font-size:7pt;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.footer{margin-top:6mm;text-align:right;font-size:8pt;color:#aaa}
+</style></head><body>
+<div class="header">
+  <div><div class="title">${esc(album.name)}</div><div class="meta">${collected} de ${slots.length} stickers completados &bull; ${today}</div></div>
+  <div class="url">myalbum-green.vercel.app</div>
+</div>
+<div class="grid">${gridHtml}</div>
+<div class="footer">MyAlbum 2026 &mdash; myalbum-green.vercel.app</div>
+</body></html>`
+
+    const w = window.open('', '_blank', 'width=900,height=700')
+    if (!w) return
+    w.document.write(html)
+    w.document.close()
+    w.focus()
+    w.onload = () => { w.print(); w.onafterprint = () => w.close() }
+  }, [album, slots, collection])
+
   // ── Derived: collection grouped by slot ───────────────────────
   const bySlot = new Map<string, CollectionItemMeta[]>()
   collection.forEach((c) => {
@@ -277,6 +331,18 @@ export default function AlbumView({ album, currentUserId, isAdminView, slots, me
           <span className="text-xs font-condensed font-bold text-mundial-purple/40">
             {approvedInCollection}/{slots.length} slots completados
           </span>
+          {collectionFetched && slots.length > 0 && (
+            <button
+              onClick={handleExportPdf}
+              title="Exportar PDF"
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-condensed font-bold tracking-wider uppercase text-mundial-purple/60 hover:text-mundial-purple hover:bg-mundial-purple/8 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+              PDF
+            </button>
+          )}
         </div>
 
         {!collectionFetched || slots.length === 0 ? (

@@ -19,7 +19,7 @@ interface Props {
   onBack: () => void
 }
 
-type Tab = 'participants' | 'slots' | 'invitations' | 'stickers' | 'review' | 'album' | 'gallery' | 'trades'
+type Tab = 'participants' | 'slots' | 'invitations' | 'stickers' | 'review' | 'album' | 'gallery' | 'trades' | 'stats'
 
 interface PendingStickerMeta extends Sticker {
   username?: string
@@ -114,6 +114,31 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [shareOpen])
+
+  // ── Estadísticas (admin) ──────────────────────────────────────────
+  interface AlbumStats {
+    stickers_by_status: Record<string, number>
+    total_members: number
+    total_slots: number
+    slots_covered: number
+    recent_activity: Array<{
+      id: string; status: string; updated_at: string
+      username: string; slot_number: number; slot_label: string | null
+    }>
+    top_reactors: Array<{ username: string; reaction_count: number }>
+    reactions_by_emoji: Record<string, number>
+  }
+  const [stats, setStats] = useState<AlbumStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(false)
+  const [statsFetched, setStatsFetched] = useState(false)
+
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true)
+    const result = await supabase.rpc('get_album_stats', { p_album_id: album.id })
+    if (!result.error && result.data) setStats(result.data as AlbumStats)
+    setStatsFetched(true)
+    setStatsLoading(false)
+  }, [album.id])
 
   // ── Perfil de usuario ─────────────────────────────────────────────
   const [profileUserId, setProfileUserId] = useState<string | null>(null)
@@ -297,7 +322,8 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
 
   useEffect(() => {
     if ((tab === 'slots') && !slotsFetched) fetchSlots()
-  }, [tab, slotsFetched, fetchSlots])
+    if (tab === 'stats' && !statsFetched) fetchStats()
+  }, [tab, slotsFetched, fetchSlots, statsFetched, fetchStats])
 
   // Sugerir el siguiente número disponible
   useEffect(() => {
@@ -645,13 +671,13 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
       {/* Tabs */}
       <div className="flex flex-wrap gap-1 bg-mundial-cream rounded-xl p-1 w-fit">
         {(isAdminView
-          ? ['participants', 'slots', 'invitations', 'stickers', 'review', 'album', 'gallery', 'trades'] as Tab[]
+          ? ['participants', 'slots', 'invitations', 'stickers', 'review', 'album', 'gallery', 'trades', 'stats'] as Tab[]
           : ['participants', 'slots', 'stickers', 'album', 'gallery', 'trades'] as Tab[]
         ).map((t) => {
           const labels: Record<Tab, string> = {
             participants: 'Participantes', slots: 'Slots', invitations: 'Invitaciones',
             stickers: 'Mis Cromos', review: 'Revisión', album: 'Mi Álbum',
-            gallery: 'Galería', trades: 'Intercambios',
+            gallery: 'Galería', trades: 'Intercambios', stats: 'Stats',
           }
           const badgeCount =
             t === 'stickers' ? tabBadges.stickers :
@@ -1251,6 +1277,147 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* ── Tab: Stats (admin) ─────────────────────────────────────── */}
+      {tab === 'stats' && isAdminView && (
+        <div className="space-y-5">
+          {statsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => <div key={i} className="h-32 rounded-2xl bg-mundial-cream animate-pulse" />)}
+            </div>
+          ) : !stats ? (
+            <div className="text-center py-14 text-mundial-purple/40 text-sm">Sin datos disponibles.</div>
+          ) : (
+            <>
+              {/* Resumen general */}
+              <div className="glass-card rounded-2xl p-5 space-y-3">
+                <h3 className="font-condensed text-[11px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
+                  Resumen
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Participantes', value: stats.total_members },
+                    { label: 'Slots',         value: stats.total_slots   },
+                    { label: 'Slots cubiertos', value: stats.slots_covered },
+                    { label: 'Cromos total',  value: Object.values(stats.stickers_by_status).reduce((a, b) => a + b, 0) },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="bg-mundial-cream rounded-xl p-3 text-center space-y-0.5">
+                      <p className="font-display text-2xl text-mundial-purple">{value}</p>
+                      <p className="font-condensed text-[10px] font-bold tracking-[0.15em] uppercase text-mundial-purple/50">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cromos por estado */}
+              <div className="glass-card rounded-2xl p-5 space-y-3">
+                <h3 className="font-condensed text-[11px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
+                  Cromos por estado
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {([
+                    { key: 'draft',    label: 'Borrador',    color: 'bg-gray-100 text-gray-600' },
+                    { key: 'pending',  label: 'En revisión', color: 'bg-amber-100 text-amber-700' },
+                    { key: 'approved', label: 'Aprobados',   color: 'bg-green-100 text-green-700' },
+                    { key: 'rejected', label: 'Rechazados',  color: 'bg-red-100 text-red-700'   },
+                  ] as const).map(({ key, label, color }) => (
+                    <div key={key} className={`${color} rounded-xl px-4 py-3 flex items-center gap-3 min-w-[120px]`}>
+                      <span className="font-display text-2xl">{stats.stickers_by_status[key] ?? 0}</span>
+                      <span className="font-condensed text-[10px] font-bold tracking-[0.15em] uppercase leading-tight">{label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Reacciones */}
+              {(Object.keys(stats.reactions_by_emoji).length > 0 || stats.top_reactors.length > 0) && (
+                <div className="glass-card rounded-2xl p-5 space-y-4">
+                  <h3 className="font-condensed text-[11px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
+                    Reacciones
+                  </h3>
+                  <div className="flex flex-wrap gap-4 items-start">
+                    {/* Emoji breakdown */}
+                    <div className="flex gap-3">
+                      {(['❤️','🔥','⭐','😂'] as const).map((emoji) => (
+                        <div key={emoji} className="bg-mundial-cream rounded-xl px-3 py-2 text-center min-w-[52px]">
+                          <p className="text-xl">{emoji}</p>
+                          <p className="font-display text-sm text-mundial-purple">{stats.reactions_by_emoji[emoji] ?? 0}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Top reactors */}
+                    {stats.top_reactors.length > 0 && (
+                      <div className="flex-1 min-w-[180px] space-y-1.5">
+                        <p className="font-condensed text-[10px] font-bold tracking-[0.2em] uppercase text-mundial-purple/40">Top reactores</p>
+                        {stats.top_reactors.map((r, i) => (
+                          <div key={r.username} className="flex items-center gap-2">
+                            <span className="font-display text-[10px] text-mundial-purple/40 w-4">{i + 1}</span>
+                            <span className="text-sm font-medium text-mundial-purple">@{r.username}</span>
+                            <span className="ml-auto font-display text-xs text-mundial-purple/60">{r.reaction_count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Actividad reciente */}
+              {stats.recent_activity.length > 0 && (
+                <div className="glass-card rounded-2xl p-5 space-y-3">
+                  <h3 className="font-condensed text-[11px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
+                    Actividad reciente
+                  </h3>
+                  <div className="space-y-2">
+                    {stats.recent_activity.map((item) => {
+                      const statusStyles: Record<string, string> = {
+                        draft:    'bg-gray-100 text-gray-600',
+                        pending:  'bg-amber-100 text-amber-700',
+                        approved: 'bg-green-100 text-green-700',
+                        rejected: 'bg-red-100 text-red-700',
+                      }
+                      const statusLabels: Record<string, string> = {
+                        draft: 'Borrador', pending: 'Revisión', approved: 'Aprobado', rejected: 'Rechazado',
+                      }
+                      const ago = (() => {
+                        const diff = Date.now() - new Date(item.updated_at).getTime()
+                        const m = Math.floor(diff / 60000)
+                        if (m < 1) return 'ahora'
+                        if (m < 60) return `hace ${m}m`
+                        const h = Math.floor(m / 60)
+                        if (h < 24) return `hace ${h}h`
+                        return `hace ${Math.floor(h / 24)}d`
+                      })()
+                      return (
+                        <div key={item.id} className="flex items-center gap-3 py-1.5 border-b border-mundial-purple/8 last:border-0">
+                          <span className={`shrink-0 text-[10px] font-bold font-condensed tracking-wider uppercase px-2 py-0.5 rounded-full ${statusStyles[item.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                            {statusLabels[item.status] ?? item.status}
+                          </span>
+                          <span className="text-sm text-mundial-purple flex-1 truncate">
+                            @{item.username}
+                            <span className="text-mundial-purple/40"> — Slot {item.slot_number}{item.slot_label ? ` (${item.slot_label})` : ''}</span>
+                          </span>
+                          <span className="shrink-0 text-[11px] text-mundial-purple/35 font-condensed">{ago}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Botón refresh */}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => { setStatsFetched(false); fetchStats() }}
+                  className="text-xs font-condensed font-bold tracking-wider uppercase text-mundial-purple/40 hover:text-mundial-purple transition-colors"
+                >
+                  ↻ Actualizar
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 

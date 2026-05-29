@@ -35,6 +35,50 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   const [tabBadges, setTabBadges] = useState<TabBadgeCounts>({ stickers: 0, album: 0, trades: 0 })
   const [notifRefreshKey, setNotifRefreshKey] = useState(0)
 
+  // ── Editar álbum ─────────────────────────────────────────────────
+  const [albumDisplay, setAlbumDisplay] = useState({
+    name: album.name, description: album.description, pack_size: album.pack_size,
+  })
+  const [editAlbumOpen, setEditAlbumOpen] = useState(false)
+  const [editName, setEditName]           = useState(album.name)
+  const [editDesc, setEditDesc]           = useState(album.description ?? '')
+  const [editPackSize, setEditPackSize]   = useState(album.pack_size)
+  const [isSavingAlbum, setIsSavingAlbum] = useState(false)
+  const [albumSaveError, setAlbumSaveError] = useState<string | null>(null)
+
+  const openEditAlbum = () => {
+    setEditName(albumDisplay.name)
+    setEditDesc(albumDisplay.description ?? '')
+    setEditPackSize(albumDisplay.pack_size)
+    setAlbumSaveError(null)
+    setEditAlbumOpen(true)
+  }
+
+  const handleSaveAlbum = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSavingAlbum(true)
+    setAlbumSaveError(null)
+    const ps = Math.max(1, Math.min(50, editPackSize))
+    const { error } = await supabase
+      .from('albums')
+      .update({ name: editName.trim(), description: editDesc.trim() || null, pack_size: ps })
+      .eq('id', album.id)
+    if (error) {
+      setAlbumSaveError(error.message)
+    } else {
+      setAlbumDisplay({ name: editName.trim(), description: editDesc.trim() || null, pack_size: ps })
+      setEditAlbumOpen(false)
+    }
+    setIsSavingAlbum(false)
+  }
+
+  useEffect(() => {
+    if (!editAlbumOpen) return
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setEditAlbumOpen(false) }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [editAlbumOpen])
+
   // ── Compartir (vista pública) ─────────────────────────────────────
   const [isPublic, setIsPublic]   = useState(album.is_public ?? false)
   const [shareOpen, setShareOpen] = useState(false)
@@ -180,7 +224,64 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   const [newSlotLabel, setNewSlotLabel] = useState('')
   const [isAddingSlot, setIsAddingSlot] = useState(false)
   const [deletingSlot, setDeletingSlot] = useState<string | null>(null)
-  const [slotError, setSlotError] = useState<string | null>(null)
+  const [slotError, setSlotError]     = useState<string | null>(null)
+  const [bulkRange, setBulkRange]     = useState('')
+  const [isBulking, setIsBulking]     = useState(false)
+  const [bulkError, setBulkError]     = useState<string | null>(null)
+  const [bulkResult, setBulkResult]   = useState<string | null>(null)
+
+  const handleBulkSlots = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setBulkError(null)
+    setBulkResult(null)
+    setIsBulking(true)
+
+    const trimmed = bulkRange.trim()
+    let from: number, to: number
+
+    if (/^\d+-\d+$/.test(trimmed)) {
+      const parts = trimmed.split('-').map(Number)
+      from = parts[0]; to = parts[1]
+    } else if (/^\d+$/.test(trimmed)) {
+      const n = parseInt(trimmed, 10)
+      from = slots.length > 0 ? Math.max(...slots.map((s) => s.slot_number)) + 1 : 1
+      to = from + n - 1
+    } else {
+      setBulkError('Formato inválido. Usá un número (ej: 22) o un rango (ej: 1-22).')
+      setIsBulking(false)
+      return
+    }
+
+    if (from < 1 || to < from || (to - from) > 499) {
+      setBulkError('Rango inválido (máximo 500 slots por operación).')
+      setIsBulking(false)
+      return
+    }
+
+    const existingNums = new Set(slots.map((s) => s.slot_number))
+    const toInsert = []
+    for (let n = from; n <= to; n++) {
+      if (!existingNums.has(n)) toInsert.push({ album_id: album.id, slot_number: n, label: null })
+    }
+
+    if (toInsert.length === 0) {
+      setBulkResult('Todos los slots en ese rango ya existen.')
+      setIsBulking(false)
+      return
+    }
+
+    const { data, error } = await supabase.from('album_slots').insert(toInsert).select()
+    if (error) {
+      setBulkError(error.message)
+    } else {
+      setSlots((prev) =>
+        [...prev, ...(data as AlbumSlot[])].sort((a, b) => a.slot_number - b.slot_number)
+      )
+      setBulkResult(`${toInsert.length} slot${toInsert.length !== 1 ? 's' : ''} creado${toInsert.length !== 1 ? 's' : ''}.`)
+      setBulkRange('')
+    }
+    setIsBulking(false)
+  }
 
   const fetchSlots = useCallback(async () => {
     setSlotsLoading(true)
@@ -432,14 +533,14 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
           <div className="w-1.5 h-8 bg-mundial-yellow rounded-full" />
           <div className="flex-1 min-w-0">
             <h2 className="font-display text-2xl sm:text-3xl tracking-wide uppercase text-mundial-purple leading-tight">
-              {album.name}
+              {albumDisplay.name}
             </h2>
             <div className="flex items-center gap-3 mt-0.5">
-              {album.description && (
-                <p className="text-sm text-mundial-purple/60">{album.description}</p>
+              {albumDisplay.description && (
+                <p className="text-sm text-mundial-purple/60">{albumDisplay.description}</p>
               )}
               <span className="text-xs text-mundial-purple/40 font-condensed">
-                · {album.pack_size} cromos por sobre
+                · {albumDisplay.pack_size} cromos por sobre
               </span>
             </div>
           </div>
@@ -448,6 +549,18 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
             refreshKey={notifRefreshKey}
             onTabBadge={setTabBadges}
           />
+          {/* Edit album button — admin only */}
+          {isAdminView && (
+            <button
+              onClick={openEditAlbum}
+              title="Editar álbum"
+              className="w-10 h-10 rounded-xl flex items-center justify-center bg-mundial-cream hover:bg-mundial-purple/8 text-mundial-purple/50 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+              </svg>
+            </button>
+          )}
           {/* Share button — admin only */}
           {isAdminView && (
             <div className="relative" data-share-panel>
@@ -738,6 +851,31 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                 </button>
               </form>
               {slotError && <p className="text-xs text-mundial-red">{slotError}</p>}
+
+              {/* Creación masiva */}
+              <div className="border-t border-mundial-purple/10 pt-3 space-y-2">
+                <p className="font-condensed text-[10px] font-bold tracking-[0.3em] uppercase text-mundial-purple/40">
+                  Creación masiva
+                </p>
+                <form onSubmit={handleBulkSlots} className="flex gap-2 flex-wrap items-center">
+                  <input
+                    type="text"
+                    value={bulkRange}
+                    onChange={(e) => { setBulkRange(e.target.value); setBulkError(null); setBulkResult(null) }}
+                    placeholder='Ej: "1-22" o "10" (agrega 10 slots)'
+                    className="flex-1 min-w-[200px] px-3 py-2 text-sm rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-yellow focus:ring-2 focus:ring-mundial-yellow/20 transition-colors"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isBulking || !bulkRange.trim()}
+                    className="px-4 py-2 bg-mundial-yellow hover:bg-mundial-yellow-dark disabled:opacity-60 text-mundial-purple font-display text-xs tracking-wider uppercase rounded-xl transition-colors"
+                  >
+                    {isBulking ? '…' : 'Crear'}
+                  </button>
+                </form>
+                {bulkError && <p className="text-xs text-mundial-red">{bulkError}</p>}
+                {bulkResult && <p className="text-xs text-mundial-green font-bold">{bulkResult}</p>}
+              </div>
             </div>
           )}
 
@@ -1027,6 +1165,93 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
           currentUserId={currentUserId}
           onClose={() => setProfileUserId(null)}
         />
+      )}
+
+      {/* ── Modal: Editar álbum ──────────────────────────────────────── */}
+      {editAlbumOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-mundial-navy-deep/60 animate-fade-in"
+          onClick={(e) => { if (e.target === e.currentTarget) setEditAlbumOpen(false) }}
+        >
+          <div className="w-full max-w-md glass-card rounded-3xl shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-mundial-purple/10">
+              <h3 className="font-display text-lg tracking-wide uppercase text-mundial-purple">Editar álbum</h3>
+              <button
+                onClick={() => setEditAlbumOpen(false)}
+                className="w-8 h-8 rounded-lg hover:bg-mundial-purple/8 text-mundial-purple/40 hover:text-mundial-purple transition-colors flex items-center justify-center"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {/* Form */}
+            <form onSubmit={handleSaveAlbum} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="font-condensed text-[10px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
+                  Nombre *
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  required
+                  maxLength={100}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-purple/50 transition-colors"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="font-condensed text-[10px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
+                  Descripción
+                </label>
+                <textarea
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  rows={2}
+                  maxLength={200}
+                  placeholder="Opcional"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-purple/50 transition-colors resize-none"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="font-condensed text-[10px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
+                  Cromos por sobre
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={editPackSize}
+                  onChange={(e) => setEditPackSize(parseInt(e.target.value, 10) || 1)}
+                  required
+                  className="w-24 px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple focus:outline-none focus:border-mundial-purple/50 transition-colors"
+                />
+              </div>
+              {albumSaveError && (
+                <p className="text-xs text-mundial-red bg-mundial-red/10 border border-mundial-red/20 rounded-xl px-3 py-2">
+                  {albumSaveError}
+                </p>
+              )}
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setEditAlbumOpen(false)}
+                  className="flex-1 px-4 py-3 rounded-xl border-2 border-mundial-purple/20 text-mundial-purple/60 font-display text-sm tracking-wider uppercase hover:border-mundial-purple/40 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingAlbum || !editName.trim()}
+                  className="flex-1 px-4 py-3 rounded-xl bg-mundial-purple hover:bg-mundial-purple/90 disabled:opacity-60 text-white font-display text-sm tracking-wider uppercase transition-colors"
+                >
+                  {isSavingAlbum ? '…' : 'Guardar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* ── Tab: Invitaciones ──────────────────────────────────────── */}

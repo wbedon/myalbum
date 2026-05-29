@@ -52,9 +52,9 @@ export default function PublicAlbumPage() {
     if (!albumId) return
     supabase
       .rpc('get_public_album', { p_album_id: albumId })
-      .then(({ data: raw, error }) => {
-        if (error || !raw) { setStatus('notfound'); return }
-        setData(raw as PublicAlbumData)
+      .then((result: { data: unknown; error: unknown }) => {
+        if (result.error || !result.data) { setStatus('notfound'); return }
+        setData(result.data as PublicAlbumData)
         setStatus('ready')
       })
   }, [albumId])

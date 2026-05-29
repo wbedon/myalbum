@@ -26,6 +26,7 @@ export default function JoinPage({ params }: { params: { token: string } }) {
   const [errorMsg, setErrorMsg] = useState('')
 
   // Auth form
+  const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
@@ -115,21 +116,30 @@ export default function JoinPage({ params }: { params: { token: string } }) {
     e.preventDefault()
     setAuthError(null)
     setAuthLoading(true)
-    const email = `${username.trim().toLowerCase()}@myalbum.internal`
+    const trimmedEmail = email.trim()
     try {
       if (authMode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
+        const { error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password })
         if (error) throw error
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
+        const { error: signUpErr } = await supabase.auth.signUp({
+          email: trimmedEmail,
           password,
           options: { data: { username: username.trim().toLowerCase() } },
         })
-        if (error) throw error
+        if (signUpErr) throw signUpErr
+        const { error: loginErr } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password })
+        if (loginErr) throw loginErr
       }
     } catch (err) {
-      setAuthError(err instanceof Error ? err.message : 'Error de autenticación.')
+      const msg = err instanceof Error ? err.message : 'Error de autenticación.'
+      setAuthError(
+        msg.includes('Invalid login credentials')
+          ? 'Email o contraseña incorrectos.'
+          : msg.includes('already registered') || msg.includes('User already registered')
+          ? 'Ese email ya está registrado. Intentá iniciar sesión.'
+          : msg
+      )
     } finally {
       setAuthLoading(false)
     }
@@ -228,7 +238,7 @@ export default function JoinPage({ params }: { params: { token: string } }) {
           <div className="space-y-3">
             <p className="text-center text-sm text-mundial-purple/60">
               Conectado como <span className="font-bold text-mundial-purple">
-                {(user.user_metadata?.username as string | undefined) ?? user.email?.replace('@myalbum.internal', '')}
+                {(user.user_metadata?.username as string | undefined) ?? user.email}
               </span>
             </p>
             <button
@@ -260,11 +270,21 @@ export default function JoinPage({ params }: { params: { token: string } }) {
               </p>
             </div>
             <form onSubmit={handleAuth} className="space-y-3">
+              {authMode === 'register' && (
+                <input
+                  type="text"
+                  placeholder="Nombre de usuario"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-purple/50 transition-colors"
+                />
+              )}
               <input
-                type="text"
-                placeholder="Nombre de usuario"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                type="email"
+                placeholder="tu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-purple/50 transition-colors"
               />

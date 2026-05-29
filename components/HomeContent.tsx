@@ -30,7 +30,7 @@ export default function HomeContent({ user, onLogout }: Props) {
   const uploaderRef = useRef<HTMLDivElement>(null)
 
   const username: string = (user.user_metadata?.username as string | undefined)
-    ?? user.email?.replace('@myalbum.internal', '')
+    ?? user.email?.split('@')[0]
     ?? user.id.slice(0, 8)
 
   useEffect(() => {

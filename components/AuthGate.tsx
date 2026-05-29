@@ -8,18 +8,15 @@ import { FlagUSA, FlagMexico, FlagCanada } from './MundialDecor'
 
 type AuthMode = 'login' | 'register'
 
-const toAuthEmail = (username: string) =>
-  `${username.toLowerCase().trim()}@myalbum.internal`
-
 const USERNAME_RE = /^[a-zA-Z0-9_.\-]+$/
 
 export default function AuthGate() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<AuthMode>('login')
+  const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [notifEmail, setNotifEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -42,35 +39,37 @@ export default function AuthGate() {
     e.preventDefault()
     setError(null)
 
-    const trimmed = username.trim()
-    if (!trimmed) { setError('El nombre de usuario es requerido.'); return }
-    if (!USERNAME_RE.test(trimmed)) {
-      setError('El usuario solo puede contener letras, números, puntos, guiones y guiones bajos.')
-      return
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) { setError('El email es requerido.'); return }
+
+    if (mode === 'register') {
+      const trimmedUsername = username.trim()
+      if (!trimmedUsername) { setError('El nombre de usuario es requerido.'); return }
+      if (!USERNAME_RE.test(trimmedUsername)) {
+        setError('El usuario solo puede contener letras, números, puntos, guiones y guiones bajos.')
+        return
+      }
     }
 
     setIsSubmitting(true)
-    const authEmail = toAuthEmail(trimmed)
 
     try {
       if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({ email: authEmail, password })
+        const { error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password })
         if (error) throw error
       } else {
+        const trimmedUsername = username.trim()
         const { error: signUpErr } = await supabase.auth.signUp({
-          email: authEmail,
+          email: trimmedEmail,
           password,
           options: {
-            data: {
-              username: trimmed,
-              notification_email: notifEmail.trim() || null,
-            },
+            data: { username: trimmedUsername },
           },
         })
         if (signUpErr) throw signUpErr
-        // El trigger auto-confirma; ingresamos directo sin verificar email
+        // El trigger auto-confirma; ingresamos directo
         const { error: loginErr } = await supabase.auth.signInWithPassword({
-          email: authEmail,
+          email: trimmedEmail,
           password,
         })
         if (loginErr) throw loginErr
@@ -79,11 +78,11 @@ export default function AuthGate() {
       const msg = err instanceof Error ? err.message : 'Error de autenticación'
       setError(
         msg.includes('Invalid login credentials')
-          ? 'Usuario o contraseña incorrectos.'
+          ? 'Email o contraseña incorrectos.'
           : msg.includes('already registered') || msg.includes('User already registered')
-          ? 'Ese nombre de usuario ya está en uso. Elegí otro.'
+          ? 'Ese email ya está registrado. Intentá iniciar sesión.'
           : msg.includes('Email not confirmed')
-          ? 'Error de confirmación. Contactá al administrador.'
+          ? 'Necesitás confirmar tu email antes de ingresar.'
           : msg.includes('Password should be at least')
           ? 'La contraseña debe tener al menos 6 caracteres.'
           : msg
@@ -96,9 +95,9 @@ export default function AuthGate() {
   const switchMode = () => {
     setMode((m) => (m === 'login' ? 'register' : 'login'))
     setError(null)
+    setEmail('')
     setUsername('')
     setPassword('')
-    setNotifEmail('')
   }
 
   if (loading) {
@@ -160,19 +159,39 @@ export default function AuthGate() {
 
             <div className="relative glass-card rounded-3xl p-8 z-10">
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Usuario */}
+
+                {/* Username — solo en registro */}
+                {mode === 'register' && (
+                  <div className="space-y-1.5">
+                    <label htmlFor="username" className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
+                      Nombre de usuario
+                    </label>
+                    <input
+                      id="username"
+                      type="text"
+                      required
+                      autoComplete="username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Ej: jugador10"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
+                    />
+                  </div>
+                )}
+
+                {/* Email */}
                 <div className="space-y-1.5">
-                  <label htmlFor="username" className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
-                    Usuario
+                  <label htmlFor="email" className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
+                    Email
                   </label>
                   <input
-                    id="username"
-                    type="text"
+                    id="email"
+                    type="email"
                     required
-                    autoComplete="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Ej: jugador10"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="tu@email.com"
                     className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
                   />
                 </div>
@@ -194,23 +213,6 @@ export default function AuthGate() {
                     className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
                   />
                 </div>
-
-                {/* Email opcional — solo en registro */}
-                {mode === 'register' && (
-                  <div className="space-y-1.5">
-                    <label htmlFor="notif-email" className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
-                      Email <span className="normal-case font-sans font-normal text-mundial-purple/40">(opcional, para notificaciones)</span>
-                    </label>
-                    <input
-                      id="notif-email"
-                      type="email"
-                      value={notifEmail}
-                      onChange={(e) => setNotifEmail(e.target.value)}
-                      placeholder="tu@email.com"
-                      className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
-                    />
-                  </div>
-                )}
 
                 {/* Error */}
                 {error && (

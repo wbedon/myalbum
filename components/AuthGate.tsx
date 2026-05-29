@@ -1,16 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import HomeContent from './HomeContent'
 import { FlagUSA, FlagMexico, FlagCanada } from './MundialDecor'
 
-type AuthMode = 'login' | 'register'
+type AuthMode = 'login' | 'register' | 'forgot'
 
 const USERNAME_RE = /^[a-zA-Z0-9_.\-]+$/
 
 export default function AuthGate() {
+  const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<AuthMode>('login')
@@ -18,6 +20,7 @@ export default function AuthGate() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
@@ -25,7 +28,11 @@ export default function AuthGate() {
       setUser(session?.user ?? null)
       setLoading(false)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        router.push('/reset-password')
+        return
+      }
       setUser(session?.user ?? null)
     })
     return () => subscription.unsubscribe()
@@ -33,6 +40,15 @@ export default function AuthGate() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
+  }
+
+  const switchMode = (next: AuthMode) => {
+    setMode(next)
+    setError(null)
+    setSuccessMsg(null)
+    setEmail('')
+    setUsername('')
+    setPassword('')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,12 +108,22 @@ export default function AuthGate() {
     }
   }
 
-  const switchMode = () => {
-    setMode((m) => (m === 'login' ? 'register' : 'login'))
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault()
     setError(null)
-    setEmail('')
-    setUsername('')
-    setPassword('')
+    setSuccessMsg(null)
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) { setError('El email es requerido.'); return }
+    setIsSubmitting(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail)
+      if (error) throw error
+      setSuccessMsg('Te enviamos un email con el enlace para restablecer tu contraseña. Revisá tu casilla (y la carpeta de spam).')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al enviar el email.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (loading) {
@@ -110,6 +136,12 @@ export default function AuthGate() {
 
   if (user) {
     return <HomeContent user={user} onLogout={handleLogout} />
+  }
+
+  const headings: Record<AuthMode, { title: string; subtitle: string }> = {
+    login:    { title: 'Iniciar sesión',    subtitle: 'Accedé a tu álbum personal' },
+    register: { title: 'Crear cuenta',      subtitle: 'Creá tu álbum del Mundial 2026' },
+    forgot:   { title: 'Recuperar cuenta',  subtitle: 'Te enviamos un enlace por email' },
   }
 
   return (
@@ -144,12 +176,10 @@ export default function AuthGate() {
               <span className="h-px w-10 bg-mundial-purple/30" />
             </div>
             <h1 className="font-display text-3xl tracking-wide uppercase text-mundial-purple">
-              {mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
+              {headings[mode].title}
             </h1>
             <p className="mt-1 text-sm text-mundial-purple/60">
-              {mode === 'login'
-                ? 'Accedé a tu álbum personal'
-                : 'Creá tu álbum del Mundial 2026'}
+              {headings[mode].subtitle}
             </p>
           </div>
 
@@ -158,6 +188,72 @@ export default function AuthGate() {
             <div className="absolute -top-2 -right-2 w-10 h-10 bg-mundial-yellow rounded-tr-2xl rounded-bl-2xl z-0 shadow" />
 
             <div className="relative glass-card rounded-3xl p-8 z-10">
+
+              {/* ── Forgot password ── */}
+              {mode === 'forgot' ? (
+                <div className="space-y-4">
+                  {successMsg ? (
+                    <>
+                      <div className="flex items-start gap-2 text-sm text-mundial-green bg-mundial-green/10 border border-mundial-green/30 rounded-xl px-4 py-3">
+                        <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        {successMsg}
+                      </div>
+                      <p className="text-center text-sm text-mundial-purple/60">
+                        <button type="button" onClick={() => switchMode('login')}
+                          className="font-semibold text-mundial-purple underline underline-offset-2 hover:text-mundial-green transition-colors">
+                          Volver al inicio de sesión
+                        </button>
+                      </p>
+                    </>
+                  ) : (
+                    <form onSubmit={handleForgot} className="space-y-4">
+                      <p className="text-sm text-mundial-purple/70">
+                        Ingresá tu email y te enviamos un enlace para restablecer tu contraseña.
+                      </p>
+                      <div className="space-y-1.5">
+                        <label htmlFor="forgot-email" className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
+                          Email
+                        </label>
+                        <input
+                          id="forgot-email"
+                          type="email"
+                          required
+                          autoComplete="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="tu@email.com"
+                          className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
+                        />
+                      </div>
+                      {error && (
+                        <div className="flex items-start gap-2 text-sm text-mundial-red bg-mundial-red/10 border border-mundial-red/30 rounded-xl px-4 py-3">
+                          <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                          </svg>
+                          {error}
+                        </div>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="w-full py-3.5 bg-gradient-to-r from-mundial-purple to-mundial-purple/80 disabled:opacity-60 disabled:cursor-not-allowed text-white font-display text-base tracking-wider uppercase rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                      >
+                        {isSubmitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                        Enviar enlace
+                      </button>
+                      <p className="text-center text-sm text-mundial-purple/60">
+                        <button type="button" onClick={() => switchMode('login')}
+                          className="font-semibold text-mundial-purple underline underline-offset-2 hover:text-mundial-green transition-colors">
+                          Volver al inicio de sesión
+                        </button>
+                      </p>
+                    </form>
+                  )}
+                </div>
+              ) : (
+              /* ── Login / Register ── */
               <form onSubmit={handleSubmit} className="space-y-4">
 
                 {/* Username — solo en registro */}
@@ -198,9 +294,20 @@ export default function AuthGate() {
 
                 {/* Contraseña */}
                 <div className="space-y-1.5">
-                  <label htmlFor="password" className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
-                    Contraseña
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="password" className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
+                      Contraseña
+                    </label>
+                    {mode === 'login' && (
+                      <button
+                        type="button"
+                        onClick={() => switchMode('forgot')}
+                        className="text-xs text-mundial-purple/50 hover:text-mundial-purple transition-colors"
+                      >
+                        ¿Olvidaste tu contraseña?
+                      </button>
+                    )}
+                  </div>
                   <input
                     id="password"
                     type="password"
@@ -240,13 +347,14 @@ export default function AuthGate() {
                   {mode === 'login' ? '¿No tenés cuenta?' : '¿Ya tenés cuenta?'}{' '}
                   <button
                     type="button"
-                    onClick={switchMode}
+                    onClick={() => switchMode(mode === 'login' ? 'register' : 'login')}
                     className="font-semibold text-mundial-purple underline underline-offset-2 hover:text-mundial-green transition-colors"
                   >
                     {mode === 'login' ? 'Registrate' : 'Iniciá sesión'}
                   </button>
                 </p>
               </form>
+              )}
             </div>
           </div>
         </div>

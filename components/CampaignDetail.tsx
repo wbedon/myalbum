@@ -321,7 +321,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   }, [album.id])
 
   useEffect(() => {
-    if ((tab === 'slots') && !slotsFetched) fetchSlots()
+    if ((tab === 'slots' || tab === 'album') && !slotsFetched) fetchSlots()
     if (tab === 'stats' && !statsFetched) fetchStats()
   }, [tab, slotsFetched, fetchSlots, statsFetched, fetchStats])
 

@@ -57,6 +57,13 @@ export default function UserProfileModal({ userId, currentUserId, onClose }: Pro
   const [bioValue, setBioValue]     = useState('')
   const [saving, setSaving]         = useState(false)
 
+  const [changingPw, setChangingPw]   = useState(false)
+  const [newPw, setNewPw]             = useState('')
+  const [confirmPw, setConfirmPw]     = useState('')
+  const [pwError, setPwError]         = useState<string | null>(null)
+  const [pwSuccess, setPwSuccess]     = useState(false)
+  const [savingPw, setSavingPw]       = useState(false)
+
   useEffect(() => {
     async function load() {
       setLoading(true)
@@ -78,6 +85,22 @@ export default function UserProfileModal({ userId, currentUserId, onClose }: Pro
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
   }, [onClose])
+
+  async function savePassword() {
+    setPwError(null)
+    if (newPw !== confirmPw) { setPwError('Las contraseñas no coinciden.'); return }
+    if (newPw.length < 6)    { setPwError('Mínimo 6 caracteres.'); return }
+    setSavingPw(true)
+    const { error } = await supabase.auth.updateUser({ password: newPw })
+    setSavingPw(false)
+    if (error) {
+      setPwError(error.message)
+    } else {
+      setPwSuccess(true)
+      setNewPw(''); setConfirmPw('')
+      setTimeout(() => { setChangingPw(false); setPwSuccess(false) }, 2000)
+    }
+  }
 
   async function saveBio() {
     if (!stats) return
@@ -270,6 +293,74 @@ export default function UserProfileModal({ userId, currentUserId, onClose }: Pro
                   })}
                 </div>
               </div>
+
+              {/* Change password — solo perfil propio */}
+              {isOwn && (
+                <div className="border-t border-mundial-purple/10 pt-4">
+                  {!changingPw ? (
+                    <button
+                      onClick={() => { setChangingPw(true); setPwError(null); setPwSuccess(false) }}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-mundial-purple/40 hover:text-mundial-purple/70 transition-colors rounded-xl hover:bg-mundial-purple/5"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                      </svg>
+                      Cambiar contraseña
+                    </button>
+                  ) : pwSuccess ? (
+                    <div className="flex items-center justify-center gap-2 py-2 text-xs text-mundial-green">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      Contraseña actualizada
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-condensed font-bold tracking-[0.2em] uppercase text-mundial-purple/50">
+                        Cambiar contraseña
+                      </p>
+                      <input
+                        type="password"
+                        placeholder="Nueva contraseña"
+                        minLength={6}
+                        value={newPw}
+                        onChange={(e) => setNewPw(e.target.value)}
+                        autoComplete="new-password"
+                        className="w-full px-3 py-2 text-sm rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-green/60 transition-colors"
+                      />
+                      <input
+                        type="password"
+                        placeholder="Confirmar contraseña"
+                        minLength={6}
+                        value={confirmPw}
+                        onChange={(e) => setConfirmPw(e.target.value)}
+                        autoComplete="new-password"
+                        className="w-full px-3 py-2 text-sm rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-green/60 transition-colors"
+                      />
+                      {pwError && (
+                        <p className="text-xs text-mundial-red bg-mundial-red/10 border border-mundial-red/20 rounded-xl px-3 py-2">
+                          {pwError}
+                        </p>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setChangingPw(false); setNewPw(''); setConfirmPw(''); setPwError(null) }}
+                          className="flex-1 py-2 text-xs text-mundial-purple/50 hover:text-mundial-purple rounded-xl border border-mundial-purple/20 hover:border-mundial-purple/40 transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={savePassword}
+                          disabled={savingPw || !newPw || !confirmPw}
+                          className="flex-1 py-2 text-xs bg-mundial-purple hover:bg-mundial-purple/90 disabled:opacity-50 text-white font-bold rounded-xl transition-colors"
+                        >
+                          {savingPw ? '…' : 'Guardar'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
             </div>
           )}

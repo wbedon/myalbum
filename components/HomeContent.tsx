@@ -55,6 +55,38 @@ export default function HomeContent({ user, onLogout }: Props) {
       })
   }, [user.id])
 
+  // ── Web Push subscription ──────────────────────────────────────
+  useEffect(() => {
+    if (!('PushManager' in window) || !('serviceWorker' in navigator)) return
+    if (Notification.permission === 'denied') return
+    Notification.requestPermission().then((perm) => {
+      if (perm !== 'granted') return
+      navigator.serviceWorker.ready.then(async (reg) => {
+        try {
+          const existing = await reg.pushManager.getSubscription()
+          const sub = existing ?? await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(
+              process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ''
+            ) as BufferSource,
+          })
+          await fetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subscription: sub.toJSON(), userId: user.id }),
+          })
+        } catch { /* permission granted but subscribe failed — silently ignore */ }
+      })
+    })
+
+    function urlBase64ToUint8Array(b64: string): Uint8Array {
+      const padding = '='.repeat((4 - (b64.length % 4)) % 4)
+      const base64 = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/')
+      const raw = atob(base64)
+      return Uint8Array.from(Array.from(raw).map((c) => c.charCodeAt(0)))
+    }
+  }, [user.id])
+
   const scrollToUploader = () => {
     uploaderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }

@@ -117,11 +117,6 @@ export default function HomeContent({ user, onLogout }: Props) {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 glass-dark rounded-full">
-              <FlagUSA className="h-3 w-4 rounded-sm" />
-              <FlagMexico className="h-3 w-4 rounded-sm" />
-              <FlagCanada className="h-3 w-4 rounded-sm" />
-            </div>
             <div className="flex items-center gap-2">
               {/* Mis Campañas — visible para cualquier miembro */}
               {hasCampaigns && !isSuperAdmin && (

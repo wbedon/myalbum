@@ -3,12 +3,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, type Album } from '@/lib/supabase'
 import CampaignDetail from './CampaignDetail'
+import TemplateManager from './TemplateManager'
 
 interface Props {
   userId: string
 }
 
 export default function AdminPanel({ userId }: Props) {
+  const [view, setView] = useState<'campaigns' | 'templates'>('campaigns')
   const [albums, setAlbums] = useState<Album[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -81,6 +83,25 @@ export default function AdminPanel({ userId }: Props) {
 
   return (
     <div className="space-y-8">
+      {/* View toggle */}
+      <div className="flex gap-1 p-1 bg-mundial-purple/10 rounded-xl w-fit">
+        <button
+          onClick={() => setView('campaigns')}
+          className={`px-5 py-2 rounded-lg font-display text-sm tracking-wider uppercase transition-colors ${view === 'campaigns' ? 'bg-mundial-purple text-white shadow' : 'text-mundial-purple/60 hover:text-mundial-purple'}`}
+        >
+          Campañas
+        </button>
+        <button
+          onClick={() => setView('templates')}
+          className={`px-5 py-2 rounded-lg font-display text-sm tracking-wider uppercase transition-colors ${view === 'templates' ? 'bg-mundial-purple text-white shadow' : 'text-mundial-purple/60 hover:text-mundial-purple'}`}
+        >
+          Plantillas
+        </button>
+      </div>
+
+      {view === 'templates' && <TemplateManager />}
+
+      {view === 'campaigns' && <>
       {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
@@ -244,6 +265,7 @@ export default function AdminPanel({ userId }: Props) {
           ))}
         </div>
       )}
+      </>}
     </div>
   )
 }

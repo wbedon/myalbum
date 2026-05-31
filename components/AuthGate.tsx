@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import HomeContent from './HomeContent'
-import { FlagUSA, FlagMexico, FlagCanada } from './MundialDecor'
 
 type AuthMode = 'login' | 'register' | 'forgot'
 
@@ -154,11 +153,6 @@ export default function AuthGate() {
               <span className="font-display text-lg leading-none">M</span>
             </div>
             <span className="font-display text-base tracking-widest leading-none">MYALBUM</span>
-          </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 glass-dark rounded-full">
-            <FlagUSA className="h-3 w-4 rounded-sm" />
-            <FlagMexico className="h-3 w-4 rounded-sm" />
-            <FlagCanada className="h-3 w-4 rounded-sm" />
           </div>
         </div>
       </div>

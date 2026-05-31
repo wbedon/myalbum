@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 
 export const runtime = 'nodejs'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 type Payload = Record<string, unknown>
 
@@ -89,28 +83,23 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { user_id, type, payload } = await req.json() as {
-      user_id: string
+    const { email, type, payload } = await req.json() as {
+      email: string
       type: string
       payload: Payload
     }
 
-    if (!user_id) return NextResponse.json({ error: 'Missing user_id' }, { status: 400 })
-
-    const { data: { user }, error: userError } =
-      await supabase.auth.admin.getUserById(user_id)
-
-    if (userError || !user?.email) return NextResponse.json({ ok: true, sent: 0 })
+    if (!email) return NextResponse.json({ error: 'Missing email' }, { status: 400 })
 
     const resend = new Resend(process.env.RESEND_API_KEY)
     await resend.emails.send({
       from: 'MyAlbum <onboarding@resend.dev>',
-      to:      user.email,
+      to:      email,
       subject: SUBJECTS[type] ?? '🔔 Nueva notificación en MyAlbum',
       html:    buildHtml(type, payload ?? {}),
     })
 
-    return NextResponse.json({ ok: true, sent: 1 })
+    return NextResponse.json({ ok: true, sent: 1, to: email })
   } catch {
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }

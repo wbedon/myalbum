@@ -15,7 +15,9 @@ export default function TemplateManager() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [newName, setNewName] = useState('')
+  const [replacingImage, setReplacingImage] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const editImageRef = useRef<HTMLInputElement>(null)
 
   const fetchTemplates = useCallback(async () => {
     setLoading(true)
@@ -78,6 +80,33 @@ export default function TemplateManager() {
     setEditingId(null)
     await fetchTemplates()
     setSaving(false)
+  }
+
+  const handleReplaceImage = async (e: React.ChangeEvent<HTMLInputElement>, t: Template) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setReplacingImage(true)
+
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const newFileName = `${Date.now()}.${ext}`
+
+    const { error: uploadErr } = await supabase.storage
+      .from('templates')
+      .upload(newFileName, file, { contentType: file.type, upsert: false })
+
+    if (uploadErr) { setReplacingImage(false); return }
+
+    const { data: urlData } = supabase.storage.from('templates').getPublicUrl(newFileName)
+    await supabase.from('templates').update({ image_url: urlData.publicUrl }).eq('id', t.id)
+
+    // Delete old image from storage
+    const oldFileName = t.image_url.split('/').pop()
+    if (oldFileName) await supabase.storage.from('templates').remove([oldFileName])
+
+    // Update local state thumbnail immediately
+    setTemplates(prev => prev.map(x => x.id === t.id ? { ...x, image_url: urlData.publicUrl } : x))
+    if (editImageRef.current) editImageRef.current.value = ''
+    setReplacingImage(false)
   }
 
   const toggleActive = async (t: Template) => {
@@ -167,6 +196,13 @@ export default function TemplateManager() {
                         className="w-16 px-2 py-1 text-sm rounded-lg border-2 border-mundial-purple/20 focus:outline-none focus:border-mundial-green"
                       />
                     </div>
+                    <label className={`flex items-center justify-center gap-1.5 w-full py-1.5 text-xs font-display tracking-wider uppercase rounded-lg cursor-pointer transition-colors ${replacingImage ? 'bg-mundial-purple/20 text-mundial-purple/40' : 'bg-mundial-purple/10 text-mundial-purple hover:bg-mundial-purple/20'}`}>
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                      </svg>
+                      {replacingImage ? 'Subiendo…' : 'Cambiar imagen'}
+                      <input ref={editImageRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={replacingImage} onChange={e => handleReplaceImage(e, t)} />
+                    </label>
                     <div className="flex gap-2">
                       <button onClick={saveEdit} disabled={saving} className="flex-1 py-1.5 text-xs font-display tracking-wider uppercase bg-mundial-green text-white rounded-lg hover:bg-mundial-green/90 transition-colors disabled:opacity-50">
                         {saving ? '…' : 'Guardar'}

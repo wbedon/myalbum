@@ -4,8 +4,6 @@ import { Resend } from 'resend'
 
 export const runtime = 'nodejs'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
-
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -104,6 +102,7 @@ export async function POST(req: NextRequest) {
 
     if (userError || !user?.email) return NextResponse.json({ ok: true, sent: 0 })
 
+    const resend = new Resend(process.env.RESEND_API_KEY)
     await resend.emails.send({
       from: 'MyAlbum <onboarding@resend.dev>',
       to:      user.email,

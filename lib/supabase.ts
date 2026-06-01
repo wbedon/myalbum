@@ -34,6 +34,7 @@ export type Template = {
   id: string
   name: string
   image_url: string
+  uniform_url?: string
   sort_order: number
   is_active: boolean
   created_at: string

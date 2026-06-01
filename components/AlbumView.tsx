@@ -27,6 +27,10 @@ interface Props {
 }
 
 export default function AlbumView({ album, currentUserId, isAdminView, slots, members }: Props) {
+  // ── Portada / Contraportada ────────────────────────────────────
+  const [portadaUrl, setPortadaUrl]               = useState<string | null>(null)
+  const [contraportadaUrl, setContraportadaUrl]   = useState<string | null>(null)
+
   // ── Packs ──────────────────────────────────────────────────────
   const [myPacks, setMyPacks]           = useState<Pack[]>([])
   const [packsFetched, setPacksFetched] = useState(false)
@@ -102,6 +106,18 @@ export default function AlbumView({ album, currentUserId, isAdminView, slots, me
     )
     setCollectionFetched(true)
   }, [album.id, currentUserId, slots])
+
+  useEffect(() => {
+    const ids = [album.portada_template_id, album.contraportada_template_id].filter(Boolean) as string[]
+    if (ids.length === 0) return
+    supabase.from('cover_templates').select('id, image_url').in('id', ids)
+      .then(({ data }: { data: { id: string; image_url: string }[] | null }) => {
+        if (!data) return
+        const map = new Map(data.map((c) => [c.id, c.image_url]))
+        setPortadaUrl(album.portada_template_id ? (map.get(album.portada_template_id) ?? null) : null)
+        setContraportadaUrl(album.contraportada_template_id ? (map.get(album.contraportada_template_id) ?? null) : null)
+      })
+  }, [album.portada_template_id, album.contraportada_template_id])
 
   useEffect(() => {
     fetchMyPacks()
@@ -212,6 +228,28 @@ body{font-family:Arial,sans-serif;background:#fff;color:#3D2761}
 
   return (
     <div className="space-y-7">
+
+      {/* ── Portada ───────────────────────────────────────────── */}
+      {portadaUrl && (
+        <div className="relative w-full max-w-xs mx-auto rounded-3xl overflow-hidden shadow-2xl border border-mundial-purple/10">
+          <img
+            src={portadaUrl}
+            alt={`Portada · ${album.name}`}
+            className="w-full aspect-[3/4] object-cover"
+          />
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-mundial-navy-deep/90 via-mundial-navy-deep/40 to-transparent px-6 pt-16 pb-6">
+            <p className="font-condensed text-[9px] font-bold tracking-[0.35em] uppercase text-mundial-yellow/70 mb-1">
+              Álbum
+            </p>
+            <h2 className="font-display text-xl tracking-wide uppercase text-white leading-tight">
+              {album.name}
+            </h2>
+            {album.description && (
+              <p className="text-xs text-white/55 mt-1 line-clamp-2">{album.description}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Admin: Distribuir Sobres ──────────────────────────── */}
       {isAdminView && (
@@ -391,6 +429,22 @@ body{font-family:Arial,sans-serif;background:#fff;color:#3D2761}
           </div>
         )}
       </div>
+
+      {/* ── Contraportada ────────────────────────────────────── */}
+      {contraportadaUrl && (
+        <div className="relative w-full max-w-xs mx-auto rounded-3xl overflow-hidden shadow-2xl border border-mundial-purple/10">
+          <img
+            src={contraportadaUrl}
+            alt={`Contraportada · ${album.name}`}
+            className="w-full aspect-[3/4] object-cover"
+          />
+          <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-mundial-navy-deep/65 backdrop-blur-sm">
+            <span className="font-condensed text-[9px] font-bold tracking-[0.25em] uppercase text-white/80">
+              Contraportada
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── Reveal overlay ───────────────────────────────────── */}
       {revealed && (

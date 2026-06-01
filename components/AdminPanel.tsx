@@ -1,16 +1,17 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { supabase, type Album } from '@/lib/supabase'
+import { supabase, type Album, type CoverTemplate } from '@/lib/supabase'
 import CampaignDetail from './CampaignDetail'
 import TemplateManager from './TemplateManager'
+import CoverTemplateManager from './CoverTemplateManager'
 
 interface Props {
   userId: string
 }
 
 export default function AdminPanel({ userId }: Props) {
-  const [view, setView] = useState<'campaigns' | 'templates'>('campaigns')
+  const [view, setView] = useState<'campaigns' | 'templates' | 'covers'>('campaigns')
   const [albums, setAlbums] = useState<Album[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -22,6 +23,10 @@ export default function AdminPanel({ userId }: Props) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null)
+  const [coverTemplates, setCoverTemplates] = useState<CoverTemplate[]>([])
+  const [coverTemplatesFetched, setCoverTemplatesFetched] = useState(false)
+  const [portadaId, setPortadaId] = useState<string | null>(null)
+  const [contraportadaId, setContraportadaId] = useState<string | null>(null)
 
   const fetchAlbums = useCallback(async () => {
     setLoading(true)
@@ -35,6 +40,14 @@ export default function AdminPanel({ userId }: Props) {
 
   useEffect(() => { fetchAlbums() }, [fetchAlbums])
 
+  useEffect(() => {
+    if (!showForm || coverTemplatesFetched) return
+    supabase.from('cover_templates').select('*').order('sort_order').then(({ data }: { data: CoverTemplate[] | null }) => {
+      if (data) setCoverTemplates(data)
+      setCoverTemplatesFetched(true)
+    })
+  }, [showForm, coverTemplatesFetched])
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
@@ -45,6 +58,8 @@ export default function AdminPanel({ userId }: Props) {
       description: description.trim() || null,
       created_by: userId,
       pack_size: packSize,
+      portada_template_id: portadaId,
+      contraportada_template_id: contraportadaId,
     })
     if (error) {
       setError(error.message)
@@ -52,6 +67,8 @@ export default function AdminPanel({ userId }: Props) {
       setName('')
       setDescription('')
       setPackSize(5)
+      setPortadaId(null)
+      setContraportadaId(null)
       setShowForm(false)
       fetchAlbums()
     }
@@ -97,9 +114,16 @@ export default function AdminPanel({ userId }: Props) {
         >
           Plantillas
         </button>
+        <button
+          onClick={() => setView('covers')}
+          className={`px-5 py-2 rounded-lg font-display text-sm tracking-wider uppercase transition-colors ${view === 'covers' ? 'bg-mundial-purple text-white shadow' : 'text-mundial-purple/60 hover:text-mundial-purple'}`}
+        >
+          Portadas
+        </button>
       </div>
 
       {view === 'templates' && <TemplateManager />}
+      {view === 'covers' && <CoverTemplateManager />}
 
       {view === 'campaigns' && <>
       {/* Header */}
@@ -176,6 +200,38 @@ export default function AdminPanel({ userId }: Props) {
                   className="w-24 px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
                 />
                 <span className="text-sm text-mundial-purple/50">cromos aleatorios incluidos en cada sobre</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
+                  Portada
+                </label>
+                <select
+                  value={portadaId ?? ''}
+                  onChange={e => setPortadaId(e.target.value || null)}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple text-sm focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
+                >
+                  <option value="">Sin portada</option>
+                  {coverTemplates.filter(c => c.type === 'portada').map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
+                  Contraportada
+                </label>
+                <select
+                  value={contraportadaId ?? ''}
+                  onChange={e => setContraportadaId(e.target.value || null)}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple text-sm focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
+                >
+                  <option value="">Sin contraportada</option>
+                  {coverTemplates.filter(c => c.type === 'contraportada').map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
             {error && (

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { supabase, type Album, type AlbumMember, type AlbumSlot, type Invitation, type Sticker } from '@/lib/supabase'
+import { supabase, type Album, type AlbumMember, type AlbumSlot, type Invitation, type Sticker, type CoverTemplate } from '@/lib/supabase'
 import StickerEditor from './StickerEditor'
 import AlbumView from './AlbumView'
 import TradeView from './TradeView'
@@ -38,18 +38,26 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   // ── Editar álbum ─────────────────────────────────────────────────
   const [albumDisplay, setAlbumDisplay] = useState({
     name: album.name, description: album.description, pack_size: album.pack_size,
+    portada_template_id: album.portada_template_id ?? null,
+    contraportada_template_id: album.contraportada_template_id ?? null,
   })
   const [editAlbumOpen, setEditAlbumOpen] = useState(false)
   const [editName, setEditName]           = useState(album.name)
   const [editDesc, setEditDesc]           = useState(album.description ?? '')
   const [editPackSize, setEditPackSize]   = useState(album.pack_size)
+  const [editPortadaId, setEditPortadaId] = useState<string | null>(album.portada_template_id ?? null)
+  const [editContraportadaId, setEditContraportadaId] = useState<string | null>(album.contraportada_template_id ?? null)
   const [isSavingAlbum, setIsSavingAlbum] = useState(false)
   const [albumSaveError, setAlbumSaveError] = useState<string | null>(null)
+  const [coverTemplates, setCoverTemplates] = useState<CoverTemplate[]>([])
+  const [coverTemplatesFetched, setCoverTemplatesFetched] = useState(false)
 
   const openEditAlbum = () => {
     setEditName(albumDisplay.name)
     setEditDesc(albumDisplay.description ?? '')
     setEditPackSize(albumDisplay.pack_size)
+    setEditPortadaId(albumDisplay.portada_template_id)
+    setEditContraportadaId(albumDisplay.contraportada_template_id)
     setAlbumSaveError(null)
     setEditAlbumOpen(true)
   }
@@ -61,12 +69,24 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
     const ps = Math.max(1, Math.min(50, editPackSize))
     const { error } = await supabase
       .from('albums')
-      .update({ name: editName.trim(), description: editDesc.trim() || null, pack_size: ps })
+      .update({
+        name: editName.trim(),
+        description: editDesc.trim() || null,
+        pack_size: ps,
+        portada_template_id: editPortadaId,
+        contraportada_template_id: editContraportadaId,
+      })
       .eq('id', album.id)
     if (error) {
       setAlbumSaveError(error.message)
     } else {
-      setAlbumDisplay({ name: editName.trim(), description: editDesc.trim() || null, pack_size: ps })
+      setAlbumDisplay({
+        name: editName.trim(),
+        description: editDesc.trim() || null,
+        pack_size: ps,
+        portada_template_id: editPortadaId,
+        contraportada_template_id: editContraportadaId,
+      })
       setEditAlbumOpen(false)
     }
     setIsSavingAlbum(false)
@@ -78,6 +98,14 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [editAlbumOpen])
+
+  useEffect(() => {
+    if (!editAlbumOpen || coverTemplatesFetched) return
+    supabase.from('cover_templates').select('*').order('sort_order').then(({ data }: { data: CoverTemplate[] | null }) => {
+      if (data) setCoverTemplates(data)
+      setCoverTemplatesFetched(true)
+    })
+  }, [editAlbumOpen, coverTemplatesFetched])
 
   // ── Compartir (vista pública) ─────────────────────────────────────
   const [isPublic, setIsPublic]   = useState(album.is_public ?? false)
@@ -1253,6 +1281,38 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                   required
                   className="w-24 px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple focus:outline-none focus:border-mundial-purple/50 transition-colors"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="font-condensed text-[10px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
+                    Portada
+                  </label>
+                  <select
+                    value={editPortadaId ?? ''}
+                    onChange={e => setEditPortadaId(e.target.value || null)}
+                    className="w-full px-3 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple text-sm focus:outline-none focus:border-mundial-purple/50 transition-colors"
+                  >
+                    <option value="">Sin portada</option>
+                    {coverTemplates.filter(c => c.type === 'portada').map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="font-condensed text-[10px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
+                    Contraportada
+                  </label>
+                  <select
+                    value={editContraportadaId ?? ''}
+                    onChange={e => setEditContraportadaId(e.target.value || null)}
+                    className="w-full px-3 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple text-sm focus:outline-none focus:border-mundial-purple/50 transition-colors"
+                  >
+                    <option value="">Sin contraportada</option>
+                    {coverTemplates.filter(c => c.type === 'contraportada').map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               {albumSaveError && (
                 <p className="text-xs text-mundial-red bg-mundial-red/10 border border-mundial-red/20 rounded-xl px-3 py-2">

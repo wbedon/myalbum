@@ -34,7 +34,13 @@ interface PublicRankEntry {
 }
 
 interface PublicAlbumData {
-  album: { id: string; name: string; description: string | null }
+  album: {
+    id: string
+    name: string
+    description: string | null
+    portada_image_url: string | null
+    contraportada_image_url: string | null
+  }
   slots: PublicSlot[]
   stickers: PublicSticker[]
   reactions: PublicReaction[]
@@ -111,6 +117,30 @@ export default function PublicAlbumPage() {
   return (
     <PageShell album={album}>
       <div className="max-w-4xl mx-auto px-4 pb-16 space-y-10">
+
+        {/* ── Portada ───────────────────────────────────────────────── */}
+        {album.portada_image_url && (
+          <section className="pt-6">
+            <div className="relative w-full max-w-xs mx-auto rounded-3xl overflow-hidden shadow-2xl border border-mundial-purple/10">
+              <img
+                src={album.portada_image_url}
+                alt={`Portada · ${album.name}`}
+                className="w-full aspect-[3/4] object-cover"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-mundial-navy-deep/90 via-mundial-navy-deep/40 to-transparent px-6 pt-16 pb-6">
+                <p className="font-condensed text-[9px] font-bold tracking-[0.35em] uppercase text-mundial-yellow/70 mb-1">
+                  Álbum oficial
+                </p>
+                <h2 className="font-display text-xl tracking-wide uppercase text-white leading-tight">
+                  {album.name}
+                </h2>
+                {album.description && (
+                  <p className="text-xs text-white/55 mt-1 line-clamp-2">{album.description}</p>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* ── Banners ──────────────────────────────────────────────── */}
         <div className="flex flex-wrap gap-3 pt-6">
@@ -261,6 +291,24 @@ export default function PublicAlbumPage() {
                   </div>
                 )
               })}
+            </div>
+          </section>
+        )}
+
+        {/* ── Contraportada ────────────────────────────────────────── */}
+        {album.contraportada_image_url && (
+          <section>
+            <div className="relative w-full max-w-xs mx-auto rounded-3xl overflow-hidden shadow-2xl border border-mundial-purple/10">
+              <img
+                src={album.contraportada_image_url}
+                alt={`Contraportada · ${album.name}`}
+                className="w-full aspect-[3/4] object-cover"
+              />
+              <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-mundial-navy-deep/65 backdrop-blur-sm">
+                <span className="font-condensed text-[9px] font-bold tracking-[0.25em] uppercase text-white/80">
+                  Contraportada
+                </span>
+              </div>
             </div>
           </section>
         )}

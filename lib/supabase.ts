@@ -43,6 +43,16 @@ export type Template = {
   club_band?: NameBand
 }
 
+export type CoverTemplate = {
+  id: string
+  name: string
+  type: 'portada' | 'contraportada'
+  image_url: string
+  sort_order: number
+  is_active: boolean
+  created_at: string
+}
+
 export type Uniform = {
   id: string
   name: string
@@ -75,6 +85,8 @@ export type Album = {
   created_at: string
   pack_size: number
   is_public: boolean
+  portada_template_id?: string | null
+  contraportada_template_id?: string | null
 }
 
 export type AlbumMember = {

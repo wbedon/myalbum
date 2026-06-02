@@ -7,6 +7,7 @@ import PhotoUploader from './PhotoUploader'
 import PhotoGallery from './PhotoGallery'
 import AdminPanel from './AdminPanel'
 import MyAlbumsPanel from './MyAlbumsPanel'
+import OrganizerDashboard from './OrganizerDashboard'
 import HeroSection from './HeroSection'
 import { FlagUSA, FlagMexico, FlagCanada } from './MundialDecor'
 import Avatar from './Avatar'
@@ -23,6 +24,7 @@ export default function HomeContent({ user, onLogout }: Props) {
   const [galleryKey, setGalleryKey] = useState(0)
   const [preloaded, setPreloaded] = useState<{ url: string; id: number } | null>(null)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [isOrganizer, setIsOrganizer] = useState(false)
   const [hasCampaigns, setHasCampaigns] = useState(false)
   const [showAdmin, setShowAdmin] = useState(false)
   const [showMyCampaigns, setShowMyCampaigns] = useState(false)
@@ -40,9 +42,8 @@ export default function HomeContent({ user, onLogout }: Props) {
       .eq('user_id', user.id)
       .single()
       .then(({ data }: { data: { role: string } | null }) => {
-        if (data?.role === 'superadmin') {
-          setIsSuperAdmin(true)
-        }
+        if (data?.role === 'superadmin') setIsSuperAdmin(true)
+        if (data?.role === 'organizer')  setIsOrganizer(true)
       })
 
     supabase
@@ -99,6 +100,61 @@ export default function HomeContent({ user, onLogout }: Props) {
   const handleUploaderReset = useCallback(() => {
     setPreloaded(null)
   }, [])
+
+  // ── Vista organizador ─────────────────────────────────────────
+  if (isOrganizer) {
+    return (
+      <div className="min-h-screen bg-mundial-cream flex flex-col">
+        {/* Top bar simplificado */}
+        <div className="bg-mundial-navy-deep text-white z-20">
+          <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-md bg-mundial-yellow flex items-center justify-center text-mundial-purple shadow ring-1 ring-white/20">
+                <span className="font-display text-lg leading-none">M</span>
+              </div>
+              <span className="font-display text-base tracking-widest leading-none">MYALBUM</span>
+              <span className="hidden sm:inline-block w-px h-3 bg-white/20" />
+              <span className="hidden sm:inline-block text-[10px] font-condensed font-bold tracking-[0.25em] uppercase text-white/60">
+                Organizador
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowProfile(true)}
+                className="flex items-center gap-2 px-2 py-1 rounded-full hover:bg-white/10 transition-colors group"
+              >
+                <Avatar username={username} size="xs" />
+                <span className="hidden sm:inline-block text-[10px] text-white/60 group-hover:text-white/90 font-condensed tracking-wide max-w-[120px] truncate transition-colors">
+                  {username}
+                </span>
+              </button>
+              <button
+                onClick={onLogout}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-xs font-condensed tracking-wider uppercase transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                </svg>
+                Salir
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-10">
+          <OrganizerDashboard userId={user.id} />
+        </main>
+
+        {showProfile && (
+          <UserProfileModal
+            userId={user.id}
+            currentUserId={user.id}
+            onClose={() => setShowProfile(false)}
+          />
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-mundial-cream flex flex-col relative">

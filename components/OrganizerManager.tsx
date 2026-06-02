@@ -59,7 +59,11 @@ export default function OrganizerManager() {
     const res = await fetch('/api/invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: inviteEmail.trim(), campaignIds: selectedCampaigns }),
+      body: JSON.stringify({
+        email:         inviteEmail.trim(),
+        campaignIds:   selectedCampaigns,
+        campaignNames: campaigns.filter(c => selectedCampaigns.includes(c.id)).map(c => c.name),
+      }),
     })
 
     const data = await res.json()

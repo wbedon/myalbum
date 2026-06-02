@@ -30,4 +30,7 @@ verify-screenshots/
 !public/**/*.png
 !public/**/*.jpg
 
+# imágenes locales de prueba
+public/portada/
+
 .vercel

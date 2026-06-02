@@ -33,4 +33,7 @@ verify-screenshots/
 # imágenes locales de prueba
 public/portada/
 
+# Claude Code
+.claude/
+
 .vercel

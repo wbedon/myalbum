@@ -271,7 +271,7 @@ export default function TemplateManager() {
                 <img
                   src={previewUniform[t.id] && t.uniform_url ? t.uniform_url : t.image_url}
                   alt={t.name}
-                  className="w-full h-full object-cover transition-opacity duration-200"
+                  className={`w-full h-full transition-opacity duration-200 ${previewUniform[t.id] ? 'object-contain' : 'object-cover'}`}
                 />
                 {/* Active badge */}
                 <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold ${t.is_active ? 'bg-mundial-green text-white' : 'bg-mundial-purple/40 text-white'}`}>

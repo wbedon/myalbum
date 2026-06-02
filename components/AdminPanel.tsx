@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { supabase, type Album, type CoverTemplate } from '@/lib/supabase'
+import { supabase, type Album, type CoverEdition } from '@/lib/supabase'
 import CampaignDetail from './CampaignDetail'
 import TemplateManager from './TemplateManager'
-import CoverTemplateManager from './CoverTemplateManager'
+import CoverEditionManager from './CoverEditionManager'
 
 interface Props {
   userId: string
@@ -23,10 +23,9 @@ export default function AdminPanel({ userId }: Props) {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null)
-  const [coverTemplates, setCoverTemplates] = useState<CoverTemplate[]>([])
-  const [coverTemplatesFetched, setCoverTemplatesFetched] = useState(false)
-  const [portadaId, setPortadaId] = useState<string | null>(null)
-  const [contraportadaId, setContraportadaId] = useState<string | null>(null)
+  const [coverEditions, setCoverEditions] = useState<CoverEdition[]>([])
+  const [coverEditionsFetched, setCoverEditionsFetched] = useState(false)
+  const [editionId, setEditionId] = useState<string | null>(null)
 
   const fetchAlbums = useCallback(async () => {
     setLoading(true)
@@ -41,12 +40,12 @@ export default function AdminPanel({ userId }: Props) {
   useEffect(() => { fetchAlbums() }, [fetchAlbums])
 
   useEffect(() => {
-    if (!showForm || coverTemplatesFetched) return
-    supabase.from('cover_templates').select('*').order('sort_order').then(({ data }: { data: CoverTemplate[] | null }) => {
-      if (data) setCoverTemplates(data)
-      setCoverTemplatesFetched(true)
+    if (!showForm || coverEditionsFetched) return
+    supabase.from('cover_editions').select('*').order('sort_order').then(({ data }: { data: CoverEdition[] | null }) => {
+      if (data) setCoverEditions(data)
+      setCoverEditionsFetched(true)
     })
-  }, [showForm, coverTemplatesFetched])
+  }, [showForm, coverEditionsFetched])
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,8 +57,7 @@ export default function AdminPanel({ userId }: Props) {
       description: description.trim() || null,
       created_by: userId,
       pack_size: packSize,
-      portada_template_id: portadaId,
-      contraportada_template_id: contraportadaId,
+      cover_edition_id: editionId,
     })
     if (error) {
       setError(error.message)
@@ -67,8 +65,7 @@ export default function AdminPanel({ userId }: Props) {
       setName('')
       setDescription('')
       setPackSize(5)
-      setPortadaId(null)
-      setContraportadaId(null)
+      setEditionId(null)
       setShowForm(false)
       fetchAlbums()
     }
@@ -123,7 +120,7 @@ export default function AdminPanel({ userId }: Props) {
       </div>
 
       {view === 'templates' && <TemplateManager />}
-      {view === 'covers' && <CoverTemplateManager />}
+      {view === 'covers' && <CoverEditionManager />}
 
       {view === 'campaigns' && <>
       {/* Header */}
@@ -202,37 +199,20 @@ export default function AdminPanel({ userId }: Props) {
                 <span className="text-sm text-mundial-purple/50">cromos aleatorios incluidos en cada sobre</span>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
-                  Portada
-                </label>
-                <select
-                  value={portadaId ?? ''}
-                  onChange={e => setPortadaId(e.target.value || null)}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple text-sm focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
-                >
-                  <option value="">Sin portada</option>
-                  {coverTemplates.filter(c => c.type === 'portada').map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
-                  Contraportada
-                </label>
-                <select
-                  value={contraportadaId ?? ''}
-                  onChange={e => setContraportadaId(e.target.value || null)}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple text-sm focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
-                >
-                  <option value="">Sin contraportada</option>
-                  {coverTemplates.filter(c => c.type === 'contraportada').map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
+            <div className="space-y-1.5">
+              <label className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
+                Edición de portadas
+              </label>
+              <select
+                value={editionId ?? ''}
+                onChange={e => setEditionId(e.target.value || null)}
+                className="w-full px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple text-sm focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
+              >
+                <option value="">Sin edición</option>
+                {coverEditions.map(e => (
+                  <option key={e.id} value={e.id}>{e.name}</option>
+                ))}
+              </select>
             </div>
             {error && (
               <div className="text-sm text-mundial-red bg-mundial-red/10 border border-mundial-red/30 rounded-xl px-4 py-3">

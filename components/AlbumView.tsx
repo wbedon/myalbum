@@ -108,16 +108,15 @@ export default function AlbumView({ album, currentUserId, isAdminView, slots, me
   }, [album.id, currentUserId, slots])
 
   useEffect(() => {
-    const ids = [album.portada_template_id, album.contraportada_template_id].filter(Boolean) as string[]
-    if (ids.length === 0) return
-    supabase.from('cover_templates').select('id, image_url').in('id', ids)
-      .then(({ data }: { data: { id: string; image_url: string }[] | null }) => {
+    if (!album.cover_edition_id) return
+    supabase.from('cover_editions').select('portada_url, contraportada_url')
+      .eq('id', album.cover_edition_id).single()
+      .then(({ data }: { data: { portada_url: string; contraportada_url: string } | null }) => {
         if (!data) return
-        const map = new Map(data.map((c) => [c.id, c.image_url]))
-        setPortadaUrl(album.portada_template_id ? (map.get(album.portada_template_id) ?? null) : null)
-        setContraportadaUrl(album.contraportada_template_id ? (map.get(album.contraportada_template_id) ?? null) : null)
+        setPortadaUrl(data.portada_url)
+        setContraportadaUrl(data.contraportada_url)
       })
-  }, [album.portada_template_id, album.contraportada_template_id])
+  }, [album.cover_edition_id])
 
   useEffect(() => {
     fetchMyPacks()

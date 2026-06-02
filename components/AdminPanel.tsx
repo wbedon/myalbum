@@ -5,13 +5,14 @@ import { supabase, type Album, type CoverEdition } from '@/lib/supabase'
 import CampaignDetail from './CampaignDetail'
 import TemplateManager from './TemplateManager'
 import CoverEditionManager from './CoverEditionManager'
+import OrganizerManager from './OrganizerManager'
 
 interface Props {
   userId: string
 }
 
 export default function AdminPanel({ userId }: Props) {
-  const [view, setView] = useState<'campaigns' | 'templates' | 'covers'>('campaigns')
+  const [view, setView] = useState<'campaigns' | 'templates' | 'covers' | 'organizers'>('campaigns')
   const [albums, setAlbums] = useState<Album[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -117,10 +118,17 @@ export default function AdminPanel({ userId }: Props) {
         >
           Portadas
         </button>
+        <button
+          onClick={() => setView('organizers')}
+          className={`px-5 py-2 rounded-lg font-display text-sm tracking-wider uppercase transition-colors ${view === 'organizers' ? 'bg-mundial-purple text-white shadow' : 'text-mundial-purple/60 hover:text-mundial-purple'}`}
+        >
+          Organizadores
+        </button>
       </div>
 
       {view === 'templates' && <TemplateManager />}
       {view === 'covers' && <CoverEditionManager />}
+      {view === 'organizers' && <OrganizerManager />}
 
       {view === 'campaigns' && <>
       {/* Header */}

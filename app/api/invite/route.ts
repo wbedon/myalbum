@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-const svcHeaders = {
-  'Authorization': `Bearer ${SERVICE_KEY}`,
-  'apikey': SERVICE_KEY,
-  'Content-Type': 'application/json',
+function adminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
 }
 
 export async function POST(req: NextRequest) {
@@ -18,47 +18,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Email requerido' }, { status: 400 })
   }
 
-  // 1. Invitar usuario via Supabase Admin API (envía email con link de configuración)
-  const inviteRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/invite`, {
-    method: 'POST',
-    headers: svcHeaders,
-    body: JSON.stringify({ email: email.trim() }),
-  })
+  const supabase = adminClient()
 
-  if (!inviteRes.ok) {
-    const err = await inviteRes.json()
-    return NextResponse.json({ error: err.msg ?? err.message ?? 'Error al invitar' }, { status: 400 })
+  // 1. Invitar usuario — Supabase envía email con link de configuración de contraseña
+  const { data, error } = await supabase.auth.admin.inviteUserByEmail(email.trim())
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 })
   }
 
-  const newUser = await inviteRes.json()
-  const userId: string = newUser.id
+  const userId = data.user.id
 
-  // 2. Crear/actualizar perfil con role='organizer'
-  // Upsert: si el trigger ya creó el perfil, actualiza el rol; si no, lo crea
-  await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
-    method: 'POST',
-    headers: { ...svcHeaders, 'Prefer': 'resolution=merge-duplicates' },
-    body: JSON.stringify({
-      user_id:  userId,
-      username: email.trim().split('@')[0],
-      role:     'organizer',
-    }),
-  })
+  // 2. Upsert perfil con role='organizer'
+  await supabase.from('profiles').upsert({
+    user_id:  userId,
+    username: email.trim().split('@')[0],
+    role:     'organizer',
+  }, { onConflict: 'user_id' })
 
-  // 3. Asignar a campañas si se especificaron
+  // 3. Asignar a campañas si se indicaron
   if (campaignIds && campaignIds.length > 0) {
-    await fetch(`${SUPABASE_URL}/rest/v1/album_members`, {
-      method: 'POST',
-      headers: { ...svcHeaders, 'Prefer': 'resolution=ignore-duplicates' },
-      body: JSON.stringify(
-        campaignIds.map(albumId => ({
-          album_id:  albumId,
-          user_id:   userId,
-          role:      'admin',
-          added_by:  null,
-        }))
-      ),
-    })
+    await supabase.from('album_members').upsert(
+      campaignIds.map(albumId => ({
+        album_id: albumId,
+        user_id:  userId,
+        role:     'admin',
+        added_by: null,
+      })),
+      { onConflict: 'album_id,user_id', ignoreDuplicates: true }
+    )
   }
 
   return NextResponse.json({ success: true })

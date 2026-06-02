@@ -1,43 +1,49 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-const svcHeaders = {
-  'Authorization': `Bearer ${SERVICE_KEY}`,
-  'apikey': SERVICE_KEY,
-  'Content-Type': 'application/json',
+function adminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
 }
 
 export async function GET() {
-  // Organizer profiles
-  const pRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/profiles?role=eq.organizer&select=user_id,username,created_at`,
-    { headers: svcHeaders }
-  )
-  const profiles: { user_id: string; username: string; created_at: string }[] = await pRes.json()
+  const supabase = adminClient()
 
-  // Auth users for emails
-  const uRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users?per_page=200`, { headers: svcHeaders })
-  const { users } = await uRes.json()
+  // Perfiles con rol organizer
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('user_id, username, created_at')
+    .eq('role', 'organizer')
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Emails via Admin API
+  const { data: { users } } = await supabase.auth.admin.listUsers({ perPage: 200 })
   const emailMap: Record<string, string> = {}
-  for (const u of (users ?? [])) emailMap[u.id] = u.email
+  for (const u of (users ?? [])) emailMap[u.id] = u.email ?? '—'
 
-  // Campaign assignments
-  const result = await Promise.all(profiles.map(async p => {
-    const amRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/album_members?user_id=eq.${p.user_id}&role=eq.admin&select=album_id,albums(id,name)`,
-      { headers: svcHeaders }
-    )
-    const memberships: { album_id: string; albums: { id: string; name: string } }[] = await amRes.json()
+  // Campañas asignadas por organizador
+  const result = await Promise.all((profiles ?? []).map(async (p: { user_id: string; username: string; created_at: string }) => {
+    const { data: memberships } = await supabase
+      .from('album_members')
+      .select('album_id, albums(id, name)')
+      .eq('user_id', p.user_id)
+      .eq('role', 'admin')
+
     return {
       user_id:    p.user_id,
       username:   p.username,
       email:      emailMap[p.user_id] ?? '—',
       created_at: p.created_at,
-      campaigns:  memberships.map(m => ({ id: m.album_id, name: m.albums?.name })),
+      campaigns:  (memberships ?? []).map((m: { album_id: string; albums: { id: string; name: string } | null }) => ({
+        id:   m.album_id,
+        name: m.albums?.name ?? '',
+      })),
     }
   }))
 
@@ -46,13 +52,9 @@ export async function GET() {
 
 export async function DELETE(req: Request) {
   const { userId } = await req.json() as { userId: string }
+  const supabase = adminClient()
 
-  // Revert role to 'user'
-  await fetch(`${SUPABASE_URL}/rest/v1/profiles?user_id=eq.${userId}`, {
-    method: 'PATCH',
-    headers: svcHeaders,
-    body: JSON.stringify({ role: 'user' }),
-  })
+  await supabase.from('profiles').update({ role: 'user' }).eq('user_id', userId)
 
   return NextResponse.json({ success: true })
 }

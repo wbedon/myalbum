@@ -26,6 +26,8 @@ export default function TemplateManager() {
   const [editUniformFile, setEditUniformFile] = useState<File | null>(null)
   const [removingUniform, setRemovingUniform] = useState(false)
 
+  const [previewUniform, setPreviewUniform] = useState<Record<string, boolean>>({})
+
   const fileRef = useRef<HTMLInputElement>(null)
   const newUniformRef = useRef<HTMLInputElement>(null)
   const editImageRef = useRef<HTMLInputElement>(null)
@@ -265,18 +267,35 @@ export default function TemplateManager() {
           {templates.map(t => (
             <div key={t.id} className={`rounded-2xl overflow-hidden border-2 transition-colors ${t.is_active ? 'border-mundial-green/40' : 'border-mundial-purple/15 opacity-60'}`}>
               {/* Thumbnail */}
-              <div className="relative aspect-[3/4] bg-mundial-cream">
-                <img src={t.image_url} alt={t.name} className="w-full h-full object-cover" />
+              <div className="relative aspect-[3/4] bg-mundial-cream overflow-hidden">
+                <img
+                  src={previewUniform[t.id] && t.uniform_url ? t.uniform_url : t.image_url}
+                  alt={t.name}
+                  className="w-full h-full object-cover transition-opacity duration-200"
+                />
                 {/* Active badge */}
                 <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold ${t.is_active ? 'bg-mundial-green text-white' : 'bg-mundial-purple/40 text-white'}`}>
                   {t.is_active ? 'Activa' : 'Inactiva'}
                 </div>
-                {/* Uniform badge */}
+                {/* Toggle badge — clickeable solo si tiene uniforme */}
                 {t.uniform_url && (
-                  <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-mundial-yellow/90 text-mundial-purple rounded-full px-2 py-0.5">
-                    <img src={t.uniform_url} alt="uniforme" className="w-4 h-4 object-contain rounded-sm" />
-                    <span className="text-[9px] font-bold uppercase">Uniforme</span>
-                  </div>
+                  <button
+                    onClick={() => setPreviewUniform(prev => ({ ...prev, [t.id]: !prev[t.id] }))}
+                    className="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full px-2 py-0.5 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                    style={{ background: previewUniform[t.id] ? 'rgba(61,39,97,0.85)' : 'rgba(255,213,0,0.92)' }}
+                  >
+                    {previewUniform[t.id] ? (
+                      <>
+                        <img src={t.image_url} alt="fondo" className="w-4 h-4 object-cover rounded-sm" />
+                        <span className="text-[9px] font-bold uppercase text-white">Fondo</span>
+                      </>
+                    ) : (
+                      <>
+                        <img src={t.uniform_url} alt="uniforme" className="w-4 h-4 object-contain rounded-sm" />
+                        <span className="text-[9px] font-bold uppercase text-mundial-purple">Uniforme</span>
+                      </>
+                    )}
+                  </button>
                 )}
               </div>
 

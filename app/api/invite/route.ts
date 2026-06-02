@@ -27,7 +27,10 @@ export async function POST(req: NextRequest) {
     redirectTo: APP_URL,
   })
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+    const msg = error.message.toLowerCase().includes('already been registered')
+      ? 'Este email ya tiene una invitación pendiente o una cuenta activa.'
+      : error.message
+    return NextResponse.json({ error: msg }, { status: 400 })
   }
 
   const userId = data.user.id

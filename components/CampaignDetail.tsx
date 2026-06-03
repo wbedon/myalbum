@@ -756,7 +756,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                         <span className="text-[9px] font-condensed font-bold tracking-[0.2em] uppercase text-mundial-yellow-dark bg-mundial-yellow/40 px-1.5 py-0.5 rounded-full">
                           Org
                         </span>
-                        {isAdminView && (
+                        {isAdminView && m.user_id !== currentUserId && (
                           <button
                             onClick={() => handleRemoveMember(m.user_id)}
                             disabled={removingId === m.user_id}

@@ -14,7 +14,7 @@ function adminClient() {
 }
 
 export async function POST(req: NextRequest) {
-  const { email, campaignIds } = await req.json() as { email: string; campaignIds?: string[] }
+  const { email, role = 'organizer', campaignIds } = await req.json() as { email: string; role?: string; campaignIds?: string[] }
 
   if (!email?.trim()) {
     return NextResponse.json({ error: 'Email requerido' }, { status: 400 })
@@ -35,11 +35,11 @@ export async function POST(req: NextRequest) {
 
   const userId = data.user.id
 
-  // 2. Upsert perfil con role='organizer'
+  // 2. Upsert perfil con el rol indicado
   await supabase.from('profiles').upsert({
     user_id:              userId,
     username:             email.trim().split('@')[0],
-    role:                 'organizer',
+    role:                 role,
     must_change_password: true,
   }, { onConflict: 'user_id' })
 

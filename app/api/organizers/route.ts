@@ -51,10 +51,18 @@ export async function GET() {
 }
 
 export async function DELETE(req: Request) {
-  const { userId } = await req.json() as { userId: string }
+  const { userId, deleteAuth } = await req.json() as { userId: string; deleteAuth?: boolean }
   const supabase = adminClient()
 
-  await supabase.from('profiles').update({ role: 'user' }).eq('user_id', userId)
+  if (deleteAuth) {
+    // Eliminar completamente: auth user, perfil y membresías
+    await supabase.auth.admin.deleteUser(userId)
+    await supabase.from('profiles').delete().eq('user_id', userId)
+    await supabase.from('album_members').delete().eq('user_id', userId)
+  } else {
+    // Solo quitar el rol organizer
+    await supabase.from('profiles').update({ role: 'user' }).eq('user_id', userId)
+  }
 
   return NextResponse.json({ success: true })
 }

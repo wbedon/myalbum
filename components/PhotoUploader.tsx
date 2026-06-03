@@ -6,18 +6,13 @@ import { composeWithTemplate, type Transform, type CropBox } from '@/lib/compose
 import TemplatePicker from './TemplatePicker'
 import CompositionEditor from './CompositionEditor'
 
-// Fallback local cuando Supabase no está configurado o la tabla está vacía
-const LOCAL_UNIFORMS: Uniform[] = [
-  { id: 'local-arg', name: 'Argentina', image_url: '/uniforms/argentina.png', sort_order: 0, is_active: true, created_at: '' },
-  { id: 'local-bra', name: 'Brasil',    image_url: '/uniforms/brasil.png',    sort_order: 1, is_active: true, created_at: '' },
-  { id: 'local-col', name: 'Colombia',  image_url: '/uniforms/colombia.png',  sort_order: 2, is_active: true, created_at: '' },
-  { id: 'local-ecu', name: 'Ecuador',   image_url: '/uniforms/ecuador.png',   sort_order: 3, is_active: true, created_at: '' },
-  { id: 'local-ven', name: 'Venezuela', image_url: '/uniforms/venezuela.png', sort_order: 4, is_active: true, created_at: '' },
-]
-
-// TODO(inpainting): modo "Fondo sin persona". Intentado con inpaint-web (no
-// existe en npm). Plan B abierto: Hugging Face Inference API vía API route
-// de Next.js. Ver notas en TODO.md.
+const LOCAL_UNIFORMS_BY_NAME: Record<string, string> = {
+  argentina: '/uniforms/argentina.png',
+  brasil:    '/uniforms/brasil.png',
+  colombia:  '/uniforms/colombia.png',
+  ecuador:   '/uniforms/ecuador.png',
+  venezuela: '/uniforms/venezuela.png',
+}
 
 type Stage = 'idle' | 'loading' | 'processing' | 'done' | 'error'
 
@@ -42,7 +37,6 @@ export default function PhotoUploader({ onPhotoSaved, preloaded, onReset, userId
   const [isMobile, setIsMobile] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
   const [selectedUniform, setSelectedUniform] = useState<Uniform | null>(null)
-  const [availableUniforms, setAvailableUniforms] = useState<Uniform[]>([])
   const [withUniform, setWithUniform] = useState(true)
   const [transform, setTransform] = useState<Transform | null>(null)
   const [crop, setCrop] = useState<CropBox>({ x: 0, y: 0, w: 1, h: 1 })
@@ -79,28 +73,17 @@ export default function PhotoUploader({ onPhotoSaved, preloaded, onReset, userId
     setCrop({ x: 0, y: 0, w: 1, h: 1 })
   }, [selectedTemplate])
 
-  // Carga la lista de uniformes disponibles (una sola vez).
+  // Auto-selecciona el uniforme desde template.uniform_url con fallback a PNGs locales.
   useEffect(() => {
-    if (!isSupabaseConfigured) { setAvailableUniforms(LOCAL_UNIFORMS); return }
-    supabase
-      .from('uniforms')
-      .select('*')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true })
-      .then((res: { data: unknown[] | null; error: unknown }) => {
-        setAvailableUniforms(!res.error && res.data && res.data.length > 0 ? (res.data as Uniform[]) : LOCAL_UNIFORMS)
-      })
-      .catch(() => setAvailableUniforms(LOCAL_UNIFORMS))
-  }, [])
-
-  // Auto-selecciona el uniforme del mismo país que la plantilla elegida.
-  useEffect(() => {
-    if (!selectedTemplate || availableUniforms.length === 0) { setSelectedUniform(null); return }
-    const match = availableUniforms.find(
-      u => u.name.toLowerCase() === selectedTemplate.name.toLowerCase()
+    if (!selectedTemplate) { setSelectedUniform(null); return }
+    const uniformUrl = selectedTemplate.uniform_url
+      ?? LOCAL_UNIFORMS_BY_NAME[selectedTemplate.name.toLowerCase()]
+      ?? null
+    setSelectedUniform(uniformUrl
+      ? { id: 'tpl-uniform', name: selectedTemplate.name, image_url: uniformUrl, sort_order: 0, is_active: true, created_at: '' }
+      : null
     )
-    setSelectedUniform(match ?? null)
-  }, [selectedTemplate, availableUniforms])
+  }, [selectedTemplate])
 
   // Mantiene la ref sincronizada para que el efecto de uniforme pueda leer el transform actual.
   useEffect(() => { transformRef.current = transform }, [transform])

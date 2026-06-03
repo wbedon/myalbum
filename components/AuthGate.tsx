@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import HomeContent from './HomeContent'
+import ForcePasswordChange from './ForcePasswordChange'
 
 type AuthMode = 'login' | 'register' | 'forgot'
 
@@ -21,6 +22,7 @@ export default function AuthGate() {
   const [error, setError] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [mustChangePassword, setMustChangePassword] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -32,7 +34,14 @@ export default function AuthGate() {
         router.push('/reset-password')
         return
       }
-      setUser(session?.user ?? null)
+      const u = session?.user ?? null
+      setUser(u)
+      if (u) {
+        supabase.from('profiles').select('must_change_password').eq('user_id', u.id).single()
+          .then(({ data }: { data: { must_change_password: boolean } | null }) => { if (data?.must_change_password) setMustChangePassword(true) })
+      } else {
+        setMustChangePassword(false)
+      }
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -131,6 +140,10 @@ export default function AuthGate() {
         <div className="w-10 h-10 rounded-full border-4 border-mundial-purple/20 border-t-mundial-purple animate-spin" />
       </div>
     )
+  }
+
+  if (user && mustChangePassword) {
+    return <ForcePasswordChange user={user} onComplete={() => setMustChangePassword(false)} />
   }
 
   if (user) {

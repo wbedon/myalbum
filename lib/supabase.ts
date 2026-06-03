@@ -75,6 +75,7 @@ export type Profile = {
   username: string | null
   role: 'user' | 'superadmin' | 'organizer'
   created_at: string
+  must_change_password?: boolean
 }
 
 export type Album = {

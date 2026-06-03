@@ -37,9 +37,10 @@ export async function POST(req: NextRequest) {
 
   // 2. Upsert perfil con role='organizer'
   await supabase.from('profiles').upsert({
-    user_id:  userId,
-    username: email.trim().split('@')[0],
-    role:     'organizer',
+    user_id:              userId,
+    username:             email.trim().split('@')[0],
+    role:                 'organizer',
+    must_change_password: true,
   }, { onConflict: 'user_id' })
 
   // 3. Asignar a campañas si se indicaron

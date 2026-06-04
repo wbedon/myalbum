@@ -1,0 +1,192 @@
+import nodemailer from 'nodemailer'
+import { createClient } from '@supabase/supabase-js'
+
+const DAILY_GLOBAL_LIMIT    = 400   // margen sobre el límite de Gmail (500/día)
+const DAILY_RECIPIENT_LIMIT = 10    // máx emails/día por destinatario
+const COOLDOWN_HOURS        = 2     // mín horas entre el mismo tipo de notif al mismo email
+const INVITE_COOLDOWN_HOURS = 24    // cooldown mayor para invitaciones
+
+const APP_URL = 'https://myalbum-green.vercel.app'
+
+function adminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+}
+
+function transporter() {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  })
+}
+
+export type EmailType =
+  | 'sticker_approved' | 'sticker_rejected'
+  | 'trade_requested'  | 'trade_accepted'
+  | 'pack_available'
+  | 'invite_organizer' | 'invite_user'
+
+export interface SendEmailParams {
+  to:      string
+  type:    EmailType
+  subject: string
+  html:    string
+}
+
+export async function sendEmail(params: SendEmailParams): Promise<{ sent: boolean; reason?: string }> {
+  const sb       = adminClient()
+  const now      = new Date()
+  const sentDate = now.toISOString().slice(0, 10) // YYYY-MM-DD UTC
+  const isInvite = params.type.startsWith('invite_')
+  const cooldownCutoff = new Date(
+    now.getTime() - (isInvite ? INVITE_COOLDOWN_HOURS : COOLDOWN_HOURS) * 3600 * 1000
+  ).toISOString()
+
+  // 1. Cuota global diaria
+  const { count: globalCount } = await sb
+    .from('email_log')
+    .select('*', { count: 'exact', head: true })
+    .eq('sent_date', sentDate)
+    .eq('blocked', false)
+
+  if ((globalCount ?? 0) >= DAILY_GLOBAL_LIMIT) {
+    await sb.from('email_log').insert({ to_email: params.to, type: params.type, sent_date: sentDate, blocked: true, block_reason: 'global_quota' })
+    console.warn(`[email] Cuota global alcanzada (${globalCount}/día) — bloqueado: ${params.to}`)
+    return { sent: false, reason: 'global_quota' }
+  }
+
+  // 2. Cuota por destinatario
+  const { count: recipientCount } = await sb
+    .from('email_log')
+    .select('*', { count: 'exact', head: true })
+    .eq('to_email', params.to)
+    .eq('sent_date', sentDate)
+    .eq('blocked', false)
+
+  if ((recipientCount ?? 0) >= DAILY_RECIPIENT_LIMIT) {
+    await sb.from('email_log').insert({ to_email: params.to, type: params.type, sent_date: sentDate, blocked: true, block_reason: 'recipient_quota' })
+    return { sent: false, reason: 'recipient_quota' }
+  }
+
+  // 3. Cooldown: mismo tipo + mismo destinatario
+  const { count: cooldownCount } = await sb
+    .from('email_log')
+    .select('*', { count: 'exact', head: true })
+    .eq('to_email', params.to)
+    .eq('type', params.type)
+    .eq('blocked', false)
+    .gte('sent_at', cooldownCutoff)
+
+  if ((cooldownCount ?? 0) > 0) {
+    await sb.from('email_log').insert({ to_email: params.to, type: params.type, sent_date: sentDate, blocked: true, block_reason: 'cooldown' })
+    return { sent: false, reason: 'cooldown' }
+  }
+
+  // 4. Enviar vía Gmail SMTP
+  try {
+    await transporter().sendMail({
+      from:    `"MyAlbum" <${process.env.GMAIL_USER}>`,
+      to:      params.to,
+      subject: params.subject,
+      html:    params.html,
+    })
+    await sb.from('email_log').insert({ to_email: params.to, type: params.type, sent_date: sentDate, sent_at: now.toISOString(), blocked: false })
+    return { sent: true }
+  } catch (err) {
+    console.error('[email] SMTP error:', err)
+    await sb.from('email_log').insert({ to_email: params.to, type: params.type, sent_date: sentDate, blocked: true, block_reason: 'smtp_error' })
+    return { sent: false, reason: 'smtp_error' }
+  }
+}
+
+// ── Asuntos ───────────────────────────────────────────────────────────────────
+
+export const NOTIFICATION_SUBJECTS: Record<string, string> = {
+  sticker_approved: '✅ Tu cromo fue aprobado — MyAlbum',
+  sticker_rejected: '❌ Tu cromo fue rechazado — MyAlbum',
+  trade_requested:  '🔄 Solicitud de intercambio — MyAlbum',
+  trade_accepted:   '🎉 Intercambio aceptado — MyAlbum',
+  pack_available:   '📦 Tenés sobres nuevos — MyAlbum',
+}
+
+// ── HTML builders ─────────────────────────────────────────────────────────────
+
+type Payload = Record<string, unknown>
+
+export function buildNotificationHtml(type: string, payload: Payload): string {
+  const slot = payload.slot_label
+    ? `${payload.slot_label} (#${payload.slot_number})`
+    : `#${payload.slot_number}`
+
+  const bodies: Record<string, string> = {
+    sticker_approved:
+      `¡Tu cromo para el slot <strong>${slot}</strong> fue aprobado y ya está visible en el álbum!`,
+    sticker_rejected:
+      `Tu cromo para el slot <strong>${slot}</strong> fue rechazado` +
+      (payload.rejection_reason ? `: <em>${payload.rejection_reason}</em>` : '.') +
+      ' Podés enviar uno nuevo desde la app.',
+    trade_requested:
+      `<strong>${payload.requester_username}</strong> quiere intercambiar su cromo ` +
+      `<strong>${payload.req_slot_label || '#' + payload.req_slot_number}</strong> por ` +
+      `tu cromo <strong>${payload.offer_slot_label || '#' + payload.offer_slot_number}</strong>. ` +
+      `Revisá la propuesta en la app.`,
+    trade_accepted:
+      `<strong>${payload.offerer_username}</strong> aceptó tu solicitud. ` +
+      `Ya tenés el cromo <strong>${payload.got_slot_label || '#' + payload.got_slot_number}</strong> en tu colección.`,
+    pack_available:
+      `Hay un sobre con <strong>${payload.pack_size} cromo${Number(payload.pack_size) !== 1 ? 's' : ''}</strong> esperándote. ¡Ábrelo ahora!`,
+  }
+
+  return buildBaseHtml(bodies[type] ?? 'Tenés una nueva notificación en MyAlbum.', 'Abrir app', APP_URL)
+}
+
+export function buildInviteHtml(role: string, inviteLink: string): string {
+  const roleLabel = role === 'organizer' ? 'organizador' : 'participante'
+  const body =
+    `Fuiste invitado a unirte a <strong>MyAlbum</strong> como <strong>${roleLabel}</strong>.` +
+    `<br><br>Hacé clic en el botón para activar tu cuenta y crear tu contraseña.` +
+    `<br><br><em style="font-size:13px;color:#6b7280;">Este enlace expira en 24 horas.</em>`
+  return buildBaseHtml(body, 'Activar cuenta', inviteLink)
+}
+
+function buildBaseHtml(body: string, ctaText: string, ctaUrl: string): string {
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;">
+        <tr>
+          <td style="background:#1a1a2e;padding:24px 32px;">
+            <h1 style="margin:0;color:#f59e0b;font-family:sans-serif;font-size:20px;font-weight:700;">MyAlbum</h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px;font-family:sans-serif;">
+            <p style="margin:0 0 24px;font-size:16px;color:#111827;line-height:1.7;">${body}</p>
+            <a href="${ctaUrl}"
+               style="display:inline-block;padding:12px 28px;background:#f59e0b;color:#000;text-decoration:none;border-radius:8px;font-weight:700;font-family:sans-serif;font-size:15px;">
+              ${ctaText}
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 32px;border-top:1px solid #e5e7eb;">
+            <p style="margin:0;font-family:sans-serif;font-size:12px;color:#9ca3af;">
+              MyAlbum — Álbum de figuritas digital
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+}

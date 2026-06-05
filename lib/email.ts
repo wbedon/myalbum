@@ -16,8 +16,9 @@ function adminClient() {
 }
 
 async function sendViaBrevo(to: string, subject: string, html: string): Promise<void> {
-  // Limpiar BOM y espacios que PowerShell puede agregar al guardar env vars
-  const apiKey = (process.env.BREVO_API_KEY ?? '').replace(/^﻿/, '').trim()
+  const clean = (s: string) => s.replace(/^﻿/, '').trim()
+  const apiKey     = clean(process.env.BREVO_API_KEY ?? '')
+  const senderEmail = clean(process.env.BREVO_SENDER_EMAIL ?? 'rbedon1983@gmail.com')
   const res = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
@@ -26,7 +27,7 @@ async function sendViaBrevo(to: string, subject: string, html: string): Promise<
       'api-key':      apiKey,
     },
     body: JSON.stringify({
-      sender:      { name: 'MyAlbum', email: process.env.BREVO_SENDER_EMAIL ?? 'rbedon1983@gmail.com' },
+      sender:      { name: 'MyAlbum', email: senderEmail },
       to:          [{ email: to }],
       subject,
       htmlContent: html,

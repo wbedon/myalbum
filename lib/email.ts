@@ -1,7 +1,6 @@
-import nodemailer from 'nodemailer'
 import { createClient } from '@supabase/supabase-js'
 
-const DAILY_GLOBAL_LIMIT    = 400   // margen sobre el límite de Gmail (500/día)
+const DAILY_GLOBAL_LIMIT    = 280   // margen sobre el límite de Brevo (300/día)
 const DAILY_RECIPIENT_LIMIT = 10    // máx emails/día por destinatario
 const COOLDOWN_HOURS        = 2     // mín horas entre el mismo tipo de notif al mismo email
 const INVITE_COOLDOWN_HOURS = 24    // cooldown mayor para invitaciones
@@ -16,14 +15,25 @@ function adminClient() {
   )
 }
 
-function transporter() {
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD,
+async function sendViaBrevo(to: string, subject: string, html: string): Promise<void> {
+  const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'accept':       'application/json',
+      'content-type': 'application/json',
+      'api-key':      process.env.BREVO_API_KEY!,
     },
+    body: JSON.stringify({
+      sender:      { name: 'MyAlbum', email: process.env.BREVO_SENDER_EMAIL ?? 'rbedon1983@gmail.com' },
+      to:          [{ email: to }],
+      subject,
+      htmlContent: html,
+    }),
   })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Brevo ${res.status}: ${body}`)
+  }
 }
 
 export type EmailType =
@@ -88,14 +98,9 @@ export async function sendEmail(params: SendEmailParams): Promise<{ sent: boolea
     return { sent: false, reason: 'cooldown' }
   }
 
-  // 4. Enviar vía Gmail SMTP
+  // 4. Enviar vía Brevo API
   try {
-    await transporter().sendMail({
-      from:    `"MyAlbum" <${process.env.GMAIL_USER}>`,
-      to:      params.to,
-      subject: params.subject,
-      html:    params.html,
-    })
+    await sendViaBrevo(params.to, params.subject, params.html)
     await sb.from('email_log').insert({ to_email: params.to, type: params.type, sent_date: sentDate, sent_at: now.toISOString(), blocked: false })
     return { sent: true }
   } catch (err) {

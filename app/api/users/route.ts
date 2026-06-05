@@ -59,9 +59,11 @@ export async function DELETE(req: NextRequest) {
   const { userId } = await req.json() as { userId: string }
   const sb = adminClient()
 
-  await sb.auth.admin.deleteUser(userId)
-  await sb.from('profiles').delete().eq('user_id', userId)
+  // Limpiar referencias added_by antes de eliminar (FK constraint en album_members)
+  await sb.from('album_members').update({ added_by: null }).eq('added_by', userId)
   await sb.from('album_members').delete().eq('user_id', userId)
+  await sb.from('profiles').delete().eq('user_id', userId)
+  await sb.auth.admin.deleteUser(userId)
 
   return NextResponse.json({ success: true })
 }

@@ -44,6 +44,7 @@ export type EmailType =
   | 'trade_requested'  | 'trade_accepted'
   | 'pack_available'
   | 'invite_organizer' | 'invite_user'
+  | 'invite_participant'
 
 export interface SendEmailParams {
   to:      string
@@ -152,6 +153,14 @@ export function buildNotificationHtml(type: string, payload: Payload): string {
   }
 
   return buildBaseHtml(bodies[type] ?? 'Tenés una nueva notificación en MyAlbum.', 'Abrir app', APP_URL)
+}
+
+export function buildCampaignInviteHtml(campaignName: string, joinUrl: string): string {
+  const body =
+    `Fuiste invitado a participar en el álbum <strong>${campaignName}</strong> en MyAlbum.` +
+    `<br><br>Hacé clic en el botón para unirte. Si no tenés cuenta, podés crear una gratis.` +
+    `<br><br><em style="font-size:13px;color:#6b7280;">Este enlace puede tener un límite de usos.</em>`
+  return buildBaseHtml(body, 'Unirme al álbum', joinUrl)
 }
 
 export function buildInviteHtml(role: string, inviteLink: string): string {

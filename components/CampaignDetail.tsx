@@ -392,6 +392,9 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   const [deletingInv, setDeletingInv] = useState<string | null>(null)
   const [invError, setInvError] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [isSendingInvEmail, setIsSendingInvEmail] = useState(false)
+  const [invEmailMsg, setInvEmailMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [expandedQR, setExpandedQR] = useState<string | null>(null)
 
   // ── Mis Cromos ────────────────────────────────────────────────────
@@ -526,6 +529,52 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
     await supabase.from('invitations').delete().eq('id', id)
     setInvitations((prev) => prev.filter((i) => i.id !== id))
     setDeletingInv(null)
+  }
+
+  const handleSendInviteEmail = async () => {
+    if (!inviteEmail.trim()) return
+    setIsSendingInvEmail(true)
+    setInvEmailMsg(null)
+
+    // Crear una invitación de 1 uso para este email
+    const { data: inv, error: invErr } = await supabase
+      .from('invitations')
+      .insert({ album_id: album.id, created_by: currentUserId, max_uses: 1 })
+      .select()
+      .single()
+
+    if (invErr || !inv) {
+      setInvEmailMsg({ ok: false, text: 'No se pudo generar el enlace.' })
+      setIsSendingInvEmail(false)
+      return
+    }
+
+    await fetchInvitations()
+
+    const joinUrl = getJoinUrl(inv.token)
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/campaigns/invite-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token ?? ''}`,
+      },
+      body: JSON.stringify({
+        email:        inviteEmail.trim(),
+        albumId:      album.id,
+        joinUrl,
+        campaignName: album.name,
+      }),
+    })
+
+    const body = await res.json()
+    if (res.ok) {
+      setInvEmailMsg({ ok: true, text: `Invitación enviada a ${inviteEmail.trim()}` })
+      setInviteEmail('')
+    } else {
+      setInvEmailMsg({ ok: false, text: body.error ?? 'Error al enviar.' })
+    }
+    setIsSendingInvEmail(false)
   }
 
   const getJoinUrl = (token: string) => {
@@ -1512,6 +1561,42 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
               Generar enlace
             </button>
             {invError && <p className="text-xs text-mundial-red">{invError}</p>}
+          </div>
+
+          {/* Invitar por email */}
+          <div className="glass-card rounded-2xl p-5 space-y-4">
+            <h3 className="font-condensed text-[11px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
+              Invitar por email
+            </h3>
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendInviteEmail()}
+                placeholder="email@ejemplo.com"
+                className="flex-1 px-3 py-2 text-sm rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple placeholder-mundial-purple/30 focus:outline-none focus:border-mundial-purple/50 transition-colors"
+              />
+              <button
+                onClick={handleSendInviteEmail}
+                disabled={isSendingInvEmail || !inviteEmail.trim()}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-mundial-purple hover:bg-mundial-purple/90 disabled:opacity-50 text-white font-display text-xs tracking-wider uppercase rounded-xl transition-colors"
+              >
+                {isSendingInvEmail ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                  </svg>
+                )}
+                Enviar
+              </button>
+            </div>
+            {invEmailMsg && (
+              <p className={`text-xs ${invEmailMsg.ok ? 'text-green-600' : 'text-mundial-red'}`}>
+                {invEmailMsg.text}
+              </p>
+            )}
           </div>
 
           {/* Lista de invitaciones */}

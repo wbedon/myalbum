@@ -13,7 +13,7 @@ interface Props {
 
 export default function AdminPanel({ userId }: Props) {
   const [view, setView] = useState<'campaigns' | 'templates' | 'covers' | 'usuarios'>('campaigns')
-  const [albums, setAlbums] = useState<Album[]>([])
+  const [albums, setAlbums] = useState<(Album & { portadaUrl: string | null })[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
@@ -32,9 +32,16 @@ export default function AdminPanel({ userId }: Props) {
     setLoading(true)
     const { data } = await supabase
       .from('albums')
-      .select('*')
+      .select('*, cover_edition:cover_editions(portada_url)')
       .order('created_at', { ascending: false })
-    if (data) setAlbums(data as Album[])
+    if (data) {
+      setAlbums(
+        (data as (Album & { cover_edition: { portada_url: string } | null })[]).map((a) => ({
+          ...a,
+          portadaUrl: (a.cover_edition as { portada_url: string } | null)?.portada_url ?? null,
+        }))
+      )
+    }
     setLoading(false)
   }, [])
 
@@ -241,8 +248,8 @@ export default function AdminPanel({ userId }: Props) {
 
       {/* Lista de campañas */}
       {loading ? (
-        <div className="grid gap-3">
-          {[1, 2].map((i) => <div key={i} className="h-24 rounded-2xl bg-mundial-cream animate-pulse" />)}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => <div key={i} className="aspect-[3/4] rounded-2xl bg-mundial-cream animate-pulse" />)}
         </div>
       ) : albums.length === 0 ? (
         <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-mundial-purple/15 space-y-3">
@@ -255,54 +262,67 @@ export default function AdminPanel({ userId }: Props) {
           <p className="text-sm text-mundial-purple/40">Creá la primera campaña con el botón de arriba.</p>
         </div>
       ) : (
-        <div className="grid gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {albums.map((album) => (
-            <div key={album.id} className="glass-card rounded-2xl p-5 flex items-center gap-4 group">
-              <button
-                onClick={() => setSelectedAlbum(album)}
-                className="flex-1 flex items-center gap-4 text-left min-w-0"
-              >
-                <div className="w-12 h-12 rounded-xl bg-mundial-yellow/20 flex items-center justify-center shrink-0 group-hover:bg-mundial-yellow/40 transition-colors">
-                  <svg className="w-6 h-6 text-mundial-purple/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div key={album.id} className="group relative aspect-[3/4] rounded-2xl overflow-hidden shadow-md hover:shadow-xl hover:scale-[1.02] transition-all duration-200">
+              {/* Cover image or placeholder */}
+              {album.portadaUrl ? (
+                <img src={album.portadaUrl} alt={album.name} className="absolute inset-0 w-full h-full object-cover" />
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-mundial-yellow-dark/80 to-mundial-purple flex items-center justify-center">
+                  <svg className="w-12 h-12 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
                   </svg>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-display text-base tracking-wide uppercase text-mundial-purple truncate group-hover:text-mundial-green transition-colors">
-                    {album.name}
-                  </p>
-                  {album.description && (
-                    <p className="text-sm text-mundial-purple/60 truncate mt-0.5">{album.description}</p>
-                  )}
-                  <p className="text-xs text-mundial-purple/40 mt-1">
-                    {formatDate(album.created_at)} · {album.pack_size} cromos/sobre
-                  </p>
-                </div>
-                <svg className="w-5 h-5 text-mundial-purple/20 group-hover:text-mundial-green transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                </svg>
-              </button>
+              )}
 
-              {/* Eliminar */}
-              <div className="flex items-center gap-2 shrink-0">
+              {/* Gradient overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+
+              {/* Clickable area */}
+              <button
+                onClick={() => setSelectedAlbum(album)}
+                className="absolute inset-0 z-10"
+                aria-label={`Abrir ${album.name}`}
+              />
+
+              {/* Delete button — top-right overlay */}
+              <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
                 {deleteId === album.id ? (
                   <>
-                    <button onClick={() => handleDelete(album.id)} disabled={isDeleting} className="px-3 py-1.5 bg-mundial-red text-white text-xs font-display tracking-wider uppercase rounded-lg disabled:opacity-60">
-                      {isDeleting ? '…' : 'Confirmar'}
+                    <button
+                      onClick={() => handleDelete(album.id)}
+                      disabled={isDeleting}
+                      className="px-2 py-1 bg-mundial-red text-white text-[10px] font-display tracking-wider uppercase rounded-lg disabled:opacity-60 shadow"
+                    >
+                      {isDeleting ? '…' : 'Borrar'}
                     </button>
-                    <button onClick={() => setDeleteId(null)} className="px-3 py-1.5 bg-mundial-cream text-mundial-purple text-xs font-display tracking-wider uppercase rounded-lg">
-                      Cancelar
+                    <button
+                      onClick={() => setDeleteId(null)}
+                      className="px-2 py-1 bg-white/80 text-mundial-purple text-[10px] font-display tracking-wider uppercase rounded-lg shadow"
+                    >
+                      No
                     </button>
                   </>
                 ) : (
                   <button
                     onClick={() => setDeleteId(album.id)}
-                    className="opacity-0 group-hover:opacity-100 p-2 rounded-lg hover:bg-mundial-red/10 text-mundial-red/60 hover:text-mundial-red transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg bg-black/40 hover:bg-mundial-red/80 text-white transition-all"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                     </svg>
                   </button>
+                )}
+              </div>
+
+              {/* Name overlay */}
+              <div className="absolute bottom-0 left-0 right-0 px-3 py-3 z-10">
+                <p className="font-display text-sm tracking-wide uppercase text-white leading-tight line-clamp-2">
+                  {album.name}
+                </p>
+                {album.description && (
+                  <p className="text-[10px] text-white/60 mt-0.5 truncate font-condensed">{album.description}</p>
                 )}
               </div>
             </div>

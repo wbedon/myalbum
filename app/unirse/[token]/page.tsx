@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
+import ForcePasswordChange from '@/components/ForcePasswordChange'
 
 interface InvitationInfo {
   album_id: string
@@ -32,6 +33,7 @@ export default function JoinPage({ params }: { params: { token: string } }) {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [authError, setAuthError] = useState<string | null>(null)
   const [authLoading, setAuthLoading] = useState(false)
+  const [mustChangePw, setMustChangePw] = useState(false)
 
   // Auth state
   useEffect(() => {
@@ -44,6 +46,16 @@ export default function JoinPage({ params }: { params: { token: string } }) {
     })
     return () => listener.subscription.unsubscribe()
   }, [])
+
+  // Check must_change_password when user logs in
+  useEffect(() => {
+    if (!user) { setMustChangePw(false); return }
+    supabase.from('profiles').select('must_change_password').eq('user_id', user.id).single()
+      .then((res: { data: unknown }) => {
+        const row = res.data as { must_change_password: boolean } | null
+        setMustChangePw(row?.must_change_password ?? false)
+      })
+  }, [user])
 
   // Fetch invitation + album in two separate queries (join via fk not reliable)
   useEffect(() => {
@@ -205,6 +217,11 @@ export default function JoinPage({ params }: { params: { token: string } }) {
         />
       </PageShell>
     )
+  }
+
+  // Forzar cambio de contraseña antes de mostrar el join
+  if (authReady && user && mustChangePw) {
+    return <ForcePasswordChange user={user} onComplete={() => setMustChangePw(false)} />
   }
 
   // status === 'valid' | 'joining'

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, type Album, type AlbumMember, type AlbumSlot, type Pack, type CollectionItem, type Sticker } from '@/lib/supabase'
+import AlbumBook from '@/components/AlbumBook'
 
 interface RevealedSticker {
   sticker_id: string
@@ -228,28 +229,6 @@ body{font-family:Arial,sans-serif;background:#fff;color:#3D2761}
   return (
     <div className="space-y-7">
 
-      {/* ── Portada ───────────────────────────────────────────── */}
-      {portadaUrl && (
-        <div className="relative w-full max-w-xs mx-auto rounded-3xl overflow-hidden shadow-2xl border border-mundial-purple/10">
-          <img
-            src={portadaUrl}
-            alt={`Portada · ${album.name}`}
-            className="w-full aspect-[3/4] object-cover"
-          />
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-mundial-navy-deep/90 via-mundial-navy-deep/40 to-transparent px-6 pt-16 pb-6">
-            <p className="font-condensed text-[9px] font-bold tracking-[0.35em] uppercase text-mundial-yellow/70 mb-1">
-              Álbum
-            </p>
-            <h2 className="font-display text-xl tracking-wide uppercase text-white leading-tight">
-              {album.name}
-            </h2>
-            {album.description && (
-              <p className="text-xs text-white/55 mt-1 line-clamp-2">{album.description}</p>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* ── Admin: Distribuir Sobres ──────────────────────────── */}
       {isAdminView && (
         <div className="glass-card rounded-2xl p-5 space-y-4">
@@ -359,15 +338,12 @@ body{font-family:Arial,sans-serif;background:#fff;color:#3D2761}
         </div>
       )}
 
-      {/* ── Mi Colección ──────────────────────────────────────── */}
+      {/* ── Álbum digital (libro) ────────────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-center gap-3">
           <h3 className="font-condensed text-[11px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
-            Mi Colección
+            Mi Álbum
           </h3>
-          <span className="text-xs font-condensed font-bold text-mundial-purple/40">
-            {approvedInCollection}/{slots.length} slots completados
-          </span>
           {collectionFetched && slots.length > 0 && (
             <button
               onClick={handleExportPdf}
@@ -382,68 +358,20 @@ body{font-family:Arial,sans-serif;background:#fff;color:#3D2761}
           )}
         </div>
 
-        {!collectionFetched || slots.length === 0 ? (
-          slots.length === 0 ? (
-            <p className="text-sm text-mundial-purple/40 italic">Sin slots definidos en esta campaña.</p>
-          ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="aspect-[3/4] rounded-xl bg-mundial-cream animate-pulse" />
-              ))}
-            </div>
-          )
+        {slots.length === 0 ? (
+          <p className="text-sm text-mundial-purple/40 italic">Sin slots definidos en esta campaña.</p>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {slots.map((slot) => {
-              const items = bySlot.get(slot.id) ?? []
-              const first = items[0]
-              const dupes = items.length
-              return (
-                <div key={slot.id} className="relative rounded-xl overflow-hidden border-2 border-mundial-purple/10 bg-white/70">
-                  {first ? (
-                    <div className="aspect-[3/4]">
-                      <img src={first.image_url} alt="" className="w-full h-full object-contain" />
-                    </div>
-                  ) : (
-                    <div className="aspect-[3/4] flex items-center justify-center bg-mundial-cream/50">
-                      <span className="font-display text-xl text-mundial-purple/20 font-bold">{slot.slot_number}</span>
-                    </div>
-                  )}
-                  <div className="px-2 py-1.5 bg-white/90 border-t border-mundial-purple/10">
-                    <p className="font-display text-[10px] tracking-wide uppercase text-mundial-purple truncate">
-                      #{slot.slot_number}{slot.label ? ` ${slot.label}` : ''}
-                    </p>
-                  </div>
-                  {dupes > 1 && (
-                    <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-mundial-purple text-white text-[9px] font-display rounded-full">
-                      ×{dupes}
-                    </div>
-                  )}
-                  {!first && (
-                    <div className="absolute inset-0 bg-mundial-cream/40" />
-                  )}
-                </div>
-              )
-            })}
-          </div>
+          <AlbumBook
+            slots={slots}
+            bySlot={bySlot}
+            portadaUrl={portadaUrl}
+            contraportadaUrl={contraportadaUrl}
+            albumName={album.name}
+            totalSlots={slots.length}
+            collectedCount={approvedInCollection}
+          />
         )}
       </div>
-
-      {/* ── Contraportada ────────────────────────────────────── */}
-      {contraportadaUrl && (
-        <div className="relative w-full max-w-xs mx-auto rounded-3xl overflow-hidden shadow-2xl border border-mundial-purple/10">
-          <img
-            src={contraportadaUrl}
-            alt={`Contraportada · ${album.name}`}
-            className="w-full aspect-[3/4] object-cover"
-          />
-          <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-mundial-navy-deep/65 backdrop-blur-sm">
-            <span className="font-condensed text-[9px] font-bold tracking-[0.25em] uppercase text-white/80">
-              Contraportada
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* ── Reveal overlay ───────────────────────────────────── */}
       {revealed && (

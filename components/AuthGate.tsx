@@ -6,6 +6,7 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import HomeContent from './HomeContent'
 import ForcePasswordChange from './ForcePasswordChange'
+import ForceProfileComplete from './ForceProfileComplete'
 
 type AuthMode = 'login' | 'register' | 'forgot'
 
@@ -23,10 +24,21 @@ export default function AuthGate() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [mustChangePassword, setMustChangePassword] = useState(false)
+  const [profileComplete, setProfileComplete]       = useState(true)
+
+  const loadProfileFlags = (userId: string) => {
+    supabase.from('profiles').select('must_change_password, profile_complete').eq('user_id', userId).single()
+      .then(({ data }: { data: { must_change_password: boolean; profile_complete: boolean } | null }) => {
+        if (data?.must_change_password) setMustChangePassword(true)
+        if (data?.profile_complete === false) setProfileComplete(false)
+      })
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
+      const u = session?.user ?? null
+      setUser(u)
+      if (u) loadProfileFlags(u.id)
       setLoading(false)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -37,10 +49,10 @@ export default function AuthGate() {
       const u = session?.user ?? null
       setUser(u)
       if (u) {
-        supabase.from('profiles').select('must_change_password').eq('user_id', u.id).single()
-          .then(({ data }: { data: { must_change_password: boolean } | null }) => { if (data?.must_change_password) setMustChangePassword(true) })
+        loadProfileFlags(u.id)
       } else {
         setMustChangePassword(false)
+        setProfileComplete(true)
       }
     })
     return () => subscription.unsubscribe()
@@ -144,6 +156,10 @@ export default function AuthGate() {
 
   if (user && mustChangePassword) {
     return <ForcePasswordChange user={user} onComplete={() => setMustChangePassword(false)} />
+  }
+
+  if (user && !profileComplete) {
+    return <ForceProfileComplete user={user} onComplete={() => setProfileComplete(true)} />
   }
 
   if (user) {

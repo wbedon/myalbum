@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
       username:             email.trim().split('@')[0],
       role:                 'user',
       must_change_password: true,
+      profile_complete:     false,
     }, { onConflict: 'user_id' })
   }
   // Si createErr → usuario ya existe, se envía el email sin contraseña provisional

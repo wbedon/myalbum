@@ -76,6 +76,7 @@ export type Profile = {
   role: 'user' | 'superadmin' | 'organizer'
   created_at: string
   must_change_password?: boolean
+  profile_complete?: boolean
 }
 
 export type Album = {

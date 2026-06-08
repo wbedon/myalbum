@@ -620,6 +620,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
       <div>
         <button
           onClick={onBack}
+          aria-label="Volver a campañas"
           className="inline-flex items-center gap-1.5 text-sm text-mundial-purple/60 hover:text-mundial-purple font-condensed font-bold tracking-wider uppercase mb-4 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

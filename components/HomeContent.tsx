@@ -25,11 +25,11 @@ export default function HomeContent({ user, onLogout }: Props) {
   const [preloaded, setPreloaded] = useState<{ url: string; id: number } | null>(null)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [isOrganizer, setIsOrganizer] = useState(false)
-  const [userRole, setUserRole] = useState<string | null>(null)
   const [hasCampaigns, setHasCampaigns] = useState(false)
   const [showAdmin, setShowAdmin] = useState(false)
   const [showMyCampaigns, setShowMyCampaigns] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
+  const [initialized, setInitialized] = useState(false)
   const uploaderRef = useRef<HTMLDivElement>(null)
 
   const username: string = (user.user_metadata?.username as string | undefined)
@@ -37,34 +37,23 @@ export default function HomeContent({ user, onLogout }: Props) {
     ?? user.id.slice(0, 8)
 
   useEffect(() => {
-    supabase
-      .from('profiles')
-      .select('role')
-      .eq('user_id', user.id)
-      .single()
-      .then(({ data }: { data: { role: string } | null }) => {
-        const role = data?.role ?? 'user'
-        setUserRole(role)
-        if (role === 'superadmin') { setIsSuperAdmin(true); setShowAdmin(true) }
-        if (role === 'organizer')  { setIsOrganizer(true); setShowMyCampaigns(true) }
-      })
+    Promise.all([
+      supabase.from('profiles').select('role').eq('user_id', user.id).single(),
+      supabase.from('album_members').select('album_id').eq('user_id', user.id).limit(1),
+    ]).then(([profileRes, membershipsRes]) => {
+      const role = (profileRes.data as { role: string } | null)?.role ?? 'user'
+      const hasMemberships = !!(membershipsRes.data && (membershipsRes.data as { album_id: string }[]).length > 0)
 
-    supabase
-      .from('album_members')
-      .select('album_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .then(({ data }: { data: { album_id: string }[] | null }) => {
-        if (data && data.length > 0) setHasCampaigns(true)
-      })
+      if (role === 'superadmin') { setIsSuperAdmin(true); setShowAdmin(true) }
+      if (role === 'organizer')  { setIsOrganizer(true); setShowMyCampaigns(true) }
+      if (role !== 'superadmin' && role !== 'organizer' && hasMemberships) {
+        setShowMyCampaigns(true)
+      }
+
+      setHasCampaigns(hasMemberships)
+      setInitialized(true)
+    })
   }, [user.id])
-
-  // Auto-abrir campañas para participantes regulares
-  useEffect(() => {
-    if (userRole && userRole !== 'superadmin' && userRole !== 'organizer' && hasCampaigns) {
-      setShowMyCampaigns(true)
-    }
-  }, [userRole, hasCampaigns])
 
   // ── Web Push subscription ──────────────────────────────────────
   useEffect(() => {
@@ -110,6 +99,14 @@ export default function HomeContent({ user, onLogout }: Props) {
   const handleUploaderReset = useCallback(() => {
     setPreloaded(null)
   }, [])
+
+  if (!initialized) {
+    return (
+      <div className="min-h-screen bg-mundial-cream flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-mundial-purple/20 border-t-mundial-purple animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-mundial-cream flex flex-col relative">

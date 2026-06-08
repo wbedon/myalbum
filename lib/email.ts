@@ -155,11 +155,14 @@ export function buildNotificationHtml(type: string, payload: Payload): string {
   return buildBaseHtml(bodies[type] ?? 'Tenés una nueva notificación en MyAlbum.', 'Abrir app', APP_URL)
 }
 
-export function buildCampaignInviteHtml(campaignName: string, joinUrl: string): string {
-  const body =
-    `Fuiste invitado a participar en el álbum <strong>${campaignName}</strong> en MyAlbum.` +
-    `<br><br>Hacé clic en el botón para unirte. Si no tenés cuenta, podés crear una gratis.` +
-    `<br><br><em style="font-size:13px;color:#6b7280;">Este enlace puede tener un límite de usos.</em>`
+export function buildCampaignInviteHtml(campaignName: string, joinUrl: string, tempPassword?: string): string {
+  const body = tempPassword
+    ? `Fuiste invitado a participar en el álbum <strong>${campaignName}</strong> en MyAlbum.` +
+      `<br><br>Tu cuenta fue creada automáticamente. Tu contraseña provisional es:` +
+      `<br><br><strong style="font-size:20px;letter-spacing:2px;color:#1a1a2e;">${tempPassword}</strong>` +
+      `<br><br>Al ingresar, el sistema te pedirá que la cambies por una de tu elección.`
+    : `Fuiste invitado a participar en el álbum <strong>${campaignName}</strong> en MyAlbum.` +
+      `<br><br>Hacé clic en el botón e ingresá con tu cuenta para unirte.`
   return buildBaseHtml(body, 'Unirme al álbum', joinUrl)
 }
 

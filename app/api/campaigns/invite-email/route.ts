@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { randomBytes } from 'crypto'
 import { sendEmail, buildCampaignInviteHtml } from '@/lib/email'
 
 export const runtime = 'nodejs'
@@ -10,6 +11,15 @@ function adminClient() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   )
+}
+
+function generateTempPassword(): string {
+  const upper  = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
+  const digits = '0123456789'
+  const bytes  = randomBytes(8)
+  const letters = Array.from({ length: 4 }, (_, i) => upper[bytes[i] % upper.length]).join('')
+  const nums    = Array.from({ length: 4 }, (_, i) => digits[bytes[i + 4] % 10]).join('')
+  return `Alb.${letters}${nums}`
 }
 
 export async function POST(req: NextRequest) {
@@ -40,11 +50,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 })
   }
 
+  // Intentar crear cuenta nueva con contraseña provisional
+  let tempPassword: string | undefined
+  const tempPw = generateTempPassword()
+  const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
+    email:         email.trim(),
+    password:      tempPw,
+    email_confirm: true,
+  })
+
+  if (!createErr && newUser?.user) {
+    tempPassword = tempPw
+    await supabase.from('profiles').upsert({
+      user_id:              newUser.user.id,
+      username:             email.trim().split('@')[0],
+      role:                 'member',
+      must_change_password: true,
+    }, { onConflict: 'user_id' })
+  }
+  // Si createErr → usuario ya existe, se envía el email sin contraseña provisional
+
   const result = await sendEmail({
     to:      email.trim(),
     type:    'invite_participant',
     subject: `🎴 Te invitaron al álbum "${campaignName}" — MyAlbum`,
-    html:    buildCampaignInviteHtml(campaignName, joinUrl),
+    html:    buildCampaignInviteHtml(campaignName, joinUrl, tempPassword),
   })
 
   if (!result.sent) {
@@ -57,5 +87,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: msgs[result.reason ?? ''] ?? 'No se pudo enviar.' }, { status: 429 })
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, isNewUser: !!tempPassword })
 }

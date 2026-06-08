@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     await supabase.from('profiles').upsert({
       user_id:              newUser.user.id,
       username:             email.trim().split('@')[0],
-      role:                 'member',
+      role:                 'user',
       must_change_password: true,
     }, { onConflict: 'user_id' })
   }

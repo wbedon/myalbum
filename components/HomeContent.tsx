@@ -25,6 +25,7 @@ export default function HomeContent({ user, onLogout }: Props) {
   const [preloaded, setPreloaded] = useState<{ url: string; id: number } | null>(null)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const [isOrganizer, setIsOrganizer] = useState(false)
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [hasCampaigns, setHasCampaigns] = useState(false)
   const [showAdmin, setShowAdmin] = useState(false)
   const [showMyCampaigns, setShowMyCampaigns] = useState(false)
@@ -42,8 +43,10 @@ export default function HomeContent({ user, onLogout }: Props) {
       .eq('user_id', user.id)
       .single()
       .then(({ data }: { data: { role: string } | null }) => {
-        if (data?.role === 'superadmin') setIsSuperAdmin(true)
-        if (data?.role === 'organizer')  { setIsOrganizer(true); setShowMyCampaigns(true) }
+        const role = data?.role ?? 'user'
+        setUserRole(role)
+        if (role === 'superadmin') setIsSuperAdmin(true)
+        if (role === 'organizer')  { setIsOrganizer(true); setShowMyCampaigns(true) }
       })
 
     supabase
@@ -55,6 +58,13 @@ export default function HomeContent({ user, onLogout }: Props) {
         if (data && data.length > 0) setHasCampaigns(true)
       })
   }, [user.id])
+
+  // Auto-abrir campañas para participantes regulares
+  useEffect(() => {
+    if (userRole && userRole !== 'superadmin' && userRole !== 'organizer' && hasCampaigns) {
+      setShowMyCampaigns(true)
+    }
+  }, [userRole, hasCampaigns])
 
   // ── Web Push subscription ──────────────────────────────────────
   useEffect(() => {

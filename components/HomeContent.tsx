@@ -45,7 +45,7 @@ export default function HomeContent({ user, onLogout }: Props) {
       .then(({ data }: { data: { role: string } | null }) => {
         const role = data?.role ?? 'user'
         setUserRole(role)
-        if (role === 'superadmin') setIsSuperAdmin(true)
+        if (role === 'superadmin') { setIsSuperAdmin(true); setShowAdmin(true) }
         if (role === 'organizer')  { setIsOrganizer(true); setShowMyCampaigns(true) }
       })
 

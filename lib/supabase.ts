@@ -104,6 +104,7 @@ export type AlbumSlot = {
   album_id: string
   slot_number: number
   label: string | null
+  assigned_user_id: string | null
   created_at: string
 }
 

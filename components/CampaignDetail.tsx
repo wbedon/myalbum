@@ -344,7 +344,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   }, [album.id])
 
   useEffect(() => {
-    if ((tab === 'slots' || tab === 'album') && !slotsFetched) fetchSlots()
+    if ((tab === 'slots' || tab === 'album' || tab === 'participants' || tab === 'stickers') && !slotsFetched) fetchSlots()
     if (tab === 'stats' && !statsFetched) fetchStats()
   }, [tab, slotsFetched, fetchSlots, statsFetched, fetchStats])
 
@@ -381,6 +381,28 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
     setSlots((prev) => prev.filter((s) => s.id !== id))
     setDeletingSlot(null)
   }
+
+  // ── Asignación de slots ──────────────────────────────────────────
+  const [assigningSlotFor, setAssigningSlotFor] = useState<string | null>(null)
+
+  const handleAssignSlot = useCallback(async (memberId: string, slotId: string | null) => {
+    setAssigningSlotFor(memberId)
+    // Liberar asignación previa de este usuario en el álbum
+    await supabase
+      .from('album_slots')
+      .update({ assigned_user_id: null })
+      .eq('album_id', album.id)
+      .eq('assigned_user_id', memberId)
+    // Asignar el nuevo slot si se seleccionó uno
+    if (slotId) {
+      await supabase
+        .from('album_slots')
+        .update({ assigned_user_id: memberId })
+        .eq('id', slotId)
+    }
+    await fetchSlots()
+    setAssigningSlotFor(null)
+  }, [album.id, fetchSlots])
 
   // ── Invitaciones ─────────────────────────────────────────────────
   const [invitations, setInvitations] = useState<Invitation[]>([])
@@ -852,28 +874,48 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                   <p className="text-sm text-mundial-purple/40 italic">Sin participantes todavía.</p>
                 ) : (
                   <div className="grid gap-2">
-                    {regulars.map((m) => (
-                      <div key={m.user_id} className="flex items-center gap-3 px-4 py-3 bg-white/60 rounded-xl group">
-                        <button
-                          onClick={() => setProfileUserId(m.user_id)}
-                          className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
-                        >
-                          <Avatar username={m.username ?? '?'} size="sm" />
-                          <span className="font-display text-sm tracking-wider text-mundial-purple truncate">{m.username}</span>
-                        </button>
-                        {isAdminView && (
+                    {regulars.map((m) => {
+                      const assignedSlot = slots.find(s => s.assigned_user_id === m.user_id) ?? null
+                      const freeSlots = slots.filter(s => !s.assigned_user_id || s.assigned_user_id === m.user_id)
+                      return (
+                        <div key={m.user_id} className="flex items-center gap-3 px-4 py-3 bg-white/60 rounded-xl group">
                           <button
-                            onClick={() => handleRemoveMember(m.user_id)}
-                            disabled={removingId === m.user_id}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-mundial-red/10 text-mundial-red/50 hover:text-mundial-red transition-all disabled:opacity-40"
+                            onClick={() => setProfileUserId(m.user_id)}
+                            className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 transition-opacity text-left"
                           >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                            </svg>
+                            <Avatar username={m.username ?? '?'} size="sm" />
+                            <span className="font-display text-sm tracking-wider text-mundial-purple truncate">{m.username}</span>
                           </button>
-                        )}
-                      </div>
-                    ))}
+                          {/* Selector de slot */}
+                          {isAdminView && slotsFetched && slots.length > 0 && (
+                            <select
+                              value={assignedSlot?.id ?? ''}
+                              onChange={(e) => handleAssignSlot(m.user_id, e.target.value || null)}
+                              disabled={assigningSlotFor === m.user_id}
+                              className="text-[11px] font-condensed font-bold rounded-lg border border-mundial-purple/20 bg-white/80 px-2 py-1 text-mundial-purple focus:outline-none focus:border-mundial-yellow disabled:opacity-50 max-w-[110px]"
+                            >
+                              <option value="">Sin slot</option>
+                              {freeSlots.map(s => (
+                                <option key={s.id} value={s.id}>
+                                  #{s.slot_number}{s.label ? ` · ${s.label}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          {isAdminView && (
+                            <button
+                              onClick={() => handleRemoveMember(m.user_id)}
+                              disabled={removingId === m.user_id}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-mundial-red/10 text-mundial-red/50 hover:text-mundial-red transition-all disabled:opacity-40"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
                 {isAdminView && (
@@ -1030,124 +1072,217 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
               onSave={handleStickerSaved}
               onClose={() => setSelectedSlotForEditor(null)}
             />
-          ) : (
-            <>
-              {/* Info banner */}
-              {(() => {
-                const mySticker = myStickers[0] ?? null
-                const statusConfig: Record<string, { label: string; dot: string; bg: string }> = {
-                  draft:    { label: 'Borrador',    dot: 'bg-mundial-yellow-dark', bg: 'bg-mundial-yellow/10 border-mundial-yellow/30' },
-                  pending:  { label: 'En revisión', dot: 'bg-mundial-purple',      bg: 'bg-mundial-purple/10 border-mundial-purple/20' },
-                  approved: { label: 'Aprobado',    dot: 'bg-mundial-green',       bg: 'bg-mundial-green/10 border-mundial-green/30' },
-                  rejected: { label: 'Rechazado',   dot: 'bg-mundial-red',         bg: 'bg-mundial-red/10 border-mundial-red/25' },
-                }
-                return (
-                  <>
-                    <div className="flex items-center gap-3 px-5 py-3 bg-mundial-green/10 border border-mundial-green/30 rounded-2xl">
-                      <svg className="w-5 h-5 text-mundial-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
-                      </svg>
-                      <span className="font-condensed text-sm font-bold text-mundial-purple">
-                        {mySticker
-                          ? `Tu sticker: ${statusConfig[mySticker.status]?.label ?? mySticker.status}`
-                          : isAdminView
-                            ? 'Elegí un slot para crear tu cromo'
-                            : 'Elegí un slot y creá tu sticker personalizado para este álbum'}
-                      </span>
+          ) : isAdminView ? (
+            /* ── Vista admin: grilla completa de slots ── */
+            (() => {
+              const mySticker = myStickers[0] ?? null
+              const statusConfig: Record<string, { label: string; dot: string; bg: string }> = {
+                draft:    { label: 'Borrador',    dot: 'bg-mundial-yellow-dark', bg: 'bg-mundial-yellow/10 border-mundial-yellow/30' },
+                pending:  { label: 'En revisión', dot: 'bg-mundial-purple',      bg: 'bg-mundial-purple/10 border-mundial-purple/20' },
+                approved: { label: 'Aprobado',    dot: 'bg-mundial-green',       bg: 'bg-mundial-green/10 border-mundial-green/30' },
+                rejected: { label: 'Rechazado',   dot: 'bg-mundial-red',         bg: 'bg-mundial-red/10 border-mundial-red/25' },
+              }
+              return (
+                <>
+                  <div className="flex items-center gap-3 px-5 py-3 bg-mundial-green/10 border border-mundial-green/30 rounded-2xl">
+                    <svg className="w-5 h-5 text-mundial-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                    </svg>
+                    <span className="font-condensed text-sm font-bold text-mundial-purple">
+                      {mySticker
+                        ? `Tu cromo: ${statusConfig[mySticker.status]?.label ?? mySticker.status}`
+                        : 'Elegí un slot para crear tu cromo'}
+                    </span>
+                  </div>
+                  {(slotsLoading || !myStickersFetched) ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {[1, 2, 3, 4].map((i) => <div key={i} className="h-32 rounded-2xl bg-mundial-cream animate-pulse" />)}
                     </div>
-
-                    {/* Slot grid */}
-                    {(slotsLoading || !myStickersFetched) ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {[1, 2, 3, 4].map((i) => <div key={i} className="h-32 rounded-2xl bg-mundial-cream animate-pulse" />)}
-                      </div>
-                    ) : slots.length === 0 ? (
-                      <div className="text-center py-14 bg-white rounded-2xl border-2 border-dashed border-mundial-purple/15 space-y-2">
-                        <p className="font-display text-base tracking-wider uppercase text-mundial-purple/50">Sin slots definidos</p>
-                        <p className="text-sm text-mundial-purple/35">El organizador todavía no creó los slots de esta campaña.</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {slots.map((slot) => {
-                          const isMySlot = mySticker?.slot_id === slot.id
-                          const sticker = isMySlot ? mySticker : null
-                          const isLocked = !!mySticker && !isMySlot
-                          const cfg = sticker ? statusConfig[sticker.status] : null
-                          const canEdit = isMySlot
-                            ? (mySticker.status === 'draft' || mySticker.status === 'rejected')
-                            : !mySticker
-                          return (
-                            <div
-                              key={slot.id}
-                              className={[
-                                'relative rounded-2xl border-2 overflow-hidden transition-all duration-200',
-                                isLocked
-                                  ? 'opacity-40 border-mundial-purple/10 bg-mundial-cream/50'
-                                  : canEdit
-                                  ? 'cursor-pointer hover:shadow-lg hover:scale-[1.02] border-mundial-purple/15 bg-white/70'
-                                  : cfg?.bg ?? 'border-mundial-purple/15 bg-white/70',
-                              ].join(' ')}
-                              onClick={() => canEdit && setSelectedSlotForEditor(slot)}
-                            >
-                              {/* Sticker thumbnail or placeholder */}
-                              {sticker ? (
-                                <div className="aspect-[3/4] bg-mundial-cream">
-                                  <img src={sticker.image_url} alt="" className="w-full h-full object-contain" />
+                  ) : slots.length === 0 ? (
+                    <div className="text-center py-14 bg-white rounded-2xl border-2 border-dashed border-mundial-purple/15 space-y-2">
+                      <p className="font-display text-base tracking-wider uppercase text-mundial-purple/50">Sin slots definidos</p>
+                      <p className="text-sm text-mundial-purple/35">El organizador todavía no creó los slots de esta campaña.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {slots.map((slot) => {
+                        const isMySlot = mySticker?.slot_id === slot.id
+                        const sticker = isMySlot ? mySticker : null
+                        const isLocked = !!mySticker && !isMySlot
+                        const cfg = sticker ? statusConfig[sticker.status] : null
+                        const canEdit = isMySlot
+                          ? (mySticker.status === 'draft' || mySticker.status === 'rejected')
+                          : !mySticker
+                        return (
+                          <div
+                            key={slot.id}
+                            className={[
+                              'relative rounded-2xl border-2 overflow-hidden transition-all duration-200',
+                              isLocked
+                                ? 'opacity-40 border-mundial-purple/10 bg-mundial-cream/50'
+                                : canEdit
+                                ? 'cursor-pointer hover:shadow-lg hover:scale-[1.02] border-mundial-purple/15 bg-white/70'
+                                : cfg?.bg ?? 'border-mundial-purple/15 bg-white/70',
+                            ].join(' ')}
+                            onClick={() => canEdit && setSelectedSlotForEditor(slot)}
+                          >
+                            {sticker ? (
+                              <div className="aspect-[3/4] bg-mundial-cream">
+                                <img src={sticker.image_url} alt="" className="w-full h-full object-contain" />
+                              </div>
+                            ) : (
+                              <div className="aspect-[3/4] flex items-center justify-center bg-mundial-cream/50">
+                                <div className="text-center space-y-2">
+                                  {isLocked ? (
+                                    <svg className="w-7 h-7 mx-auto text-mundial-purple/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                                    </svg>
+                                  ) : (
+                                    <>
+                                      <div className="w-10 h-10 mx-auto rounded-xl bg-mundial-purple/10 flex items-center justify-center">
+                                        <span className="font-display text-lg text-mundial-purple font-bold">{slot.slot_number}</span>
+                                      </div>
+                                      <p className="text-xs text-mundial-purple/40 font-condensed font-bold">+ Crear</p>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            <div className="px-3 py-2 space-y-1 bg-white/90 border-t border-mundial-purple/10">
+                              <p className="font-display text-xs tracking-wide uppercase text-mundial-purple truncate">
+                                #{slot.slot_number} {slot.label ?? ''}
+                              </p>
+                              {cfg ? (
+                                <div className="flex items-center gap-1.5">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                                  <span className="text-[10px] font-condensed font-bold tracking-wider uppercase text-mundial-purple/60">{cfg.label}</span>
                                 </div>
                               ) : (
-                                <div className="aspect-[3/4] flex items-center justify-center bg-mundial-cream/50">
-                                  <div className="text-center space-y-2">
-                                    {isLocked ? (
-                                      <svg className="w-7 h-7 mx-auto text-mundial-purple/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                                      </svg>
-                                    ) : (
-                                      <>
-                                        <div className="w-10 h-10 mx-auto rounded-xl bg-mundial-purple/10 flex items-center justify-center">
-                                          <span className="font-display text-lg text-mundial-purple font-bold">{slot.slot_number}</span>
-                                        </div>
-                                        <p className="text-xs text-mundial-purple/40 font-condensed font-bold">+ Crear</p>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                              {/* Footer */}
-                              <div className="px-3 py-2 space-y-1 bg-white/90 border-t border-mundial-purple/10">
-                                <p className="font-display text-xs tracking-wide uppercase text-mundial-purple truncate">
-                                  #{slot.slot_number} {slot.label ?? ''}
+                                <p className="text-[10px] font-condensed font-bold tracking-wider uppercase text-mundial-purple/35">
+                                  {isLocked ? 'Bloqueado' : 'Sin cromo'}
                                 </p>
-                                {cfg ? (
-                                  <div className="flex items-center gap-1.5">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                                    <span className="text-[10px] font-condensed font-bold tracking-wider uppercase text-mundial-purple/60">{cfg.label}</span>
-                                  </div>
-                                ) : (
-                                  <p className="text-[10px] font-condensed font-bold tracking-wider uppercase text-mundial-purple/35">
-                                    {isLocked ? 'Bloqueado' : 'Sin cromo'}
-                                  </p>
-                                )}
-                              </div>
-                              {/* Rejected reason tooltip */}
-                              {sticker?.status === 'rejected' && sticker.rejection_reason && (
-                                <div className="absolute top-2 right-2">
-                                  <div className="w-5 h-5 rounded-full bg-mundial-red flex items-center justify-center" title={sticker.rejection_reason}>
-                                    <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
-                                    </svg>
-                                  </div>
-                                </div>
                               )}
                             </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </>
+                            {sticker?.status === 'rejected' && sticker.rejection_reason && (
+                              <div className="absolute top-2 right-2">
+                                <div className="w-5 h-5 rounded-full bg-mundial-red flex items-center justify-center" title={sticker.rejection_reason}>
+                                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
+                                  </svg>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              )
+            })()
+          ) : (
+            /* ── Vista participante: slot asignado único ── */
+            (() => {
+              const mySticker = myStickers[0] ?? null
+              const myAssignedSlot = slotsFetched ? (slots.find(s => s.assigned_user_id === currentUserId) ?? null) : undefined
+              const statusConfig: Record<string, { label: string; dot: string; bg: string; border: string }> = {
+                draft:    { label: 'Borrador',    dot: 'bg-mundial-yellow-dark', bg: 'bg-mundial-yellow/10',  border: 'border-mundial-yellow/30' },
+                pending:  { label: 'En revisión', dot: 'bg-mundial-purple',      bg: 'bg-mundial-purple/10', border: 'border-mundial-purple/25' },
+                approved: { label: 'Aprobado',    dot: 'bg-mundial-green',       bg: 'bg-mundial-green/10',  border: 'border-mundial-green/30' },
+                rejected: { label: 'Rechazado',   dot: 'bg-mundial-red',         bg: 'bg-mundial-red/10',    border: 'border-mundial-red/25' },
+              }
+
+              if (!slotsFetched || !myStickersFetched) {
+                return <div className="h-56 rounded-2xl bg-mundial-cream animate-pulse" />
+              }
+
+              if (!myAssignedSlot) {
+                return (
+                  <div className="text-center py-16 bg-white rounded-2xl border-2 border-dashed border-mundial-purple/15 space-y-3">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-mundial-purple/8 flex items-center justify-center">
+                      <svg className="w-7 h-7 text-mundial-purple/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
+                      </svg>
+                    </div>
+                    <p className="font-display text-base tracking-wider uppercase text-mundial-purple/50">Sin slot asignado</p>
+                    <p className="text-sm text-mundial-purple/35 max-w-xs mx-auto">El organizador aún no te asignó un slot en este álbum.</p>
+                  </div>
                 )
-              })()}
-            </>
+              }
+
+              const cfg = mySticker ? statusConfig[mySticker.status] : null
+              const canEdit = !mySticker || mySticker.status === 'draft' || mySticker.status === 'rejected'
+
+              return (
+                <div className="space-y-4">
+                  {/* Badge de slot asignado */}
+                  <div className="flex items-center gap-2 px-4 py-2 bg-mundial-purple/8 border border-mundial-purple/15 rounded-xl w-fit">
+                    <span className="font-condensed text-[11px] font-bold tracking-[0.25em] uppercase text-mundial-purple/50">Slot asignado</span>
+                    <span className="font-display text-sm font-bold tracking-wider text-mundial-purple">
+                      #{myAssignedSlot.slot_number}{myAssignedSlot.label ? ` · ${myAssignedSlot.label}` : ''}
+                    </span>
+                    {cfg && (
+                      <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-condensed font-bold tracking-wider uppercase ${cfg.bg} ${cfg.border} border text-mundial-purple/70`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                        {cfg.label}
+                      </span>
+                    )}
+                  </div>
+
+                  {mySticker ? (
+                    /* Sticker existente */
+                    <div className="flex flex-col items-center gap-5">
+                      <div className="w-52 rounded-2xl overflow-hidden border-2 border-mundial-purple/15 shadow-md bg-mundial-cream">
+                        <img src={mySticker.image_url} alt="Mi sticker" className="w-full object-contain" />
+                      </div>
+                      {mySticker.status === 'rejected' && mySticker.rejection_reason && (
+                        <div className="flex items-start gap-2 px-4 py-3 bg-mundial-red/8 border border-mundial-red/20 rounded-xl max-w-xs">
+                          <svg className="w-4 h-4 text-mundial-red shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
+                          </svg>
+                          <p className="text-xs text-mundial-red/80">{mySticker.rejection_reason}</p>
+                        </div>
+                      )}
+                      {mySticker.status === 'approved' && (
+                        <div className="flex items-center gap-2 px-4 py-2 bg-mundial-green/10 border border-mundial-green/30 rounded-xl">
+                          <svg className="w-4 h-4 text-mundial-green" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <p className="text-sm font-condensed font-bold text-mundial-green">Tu sticker fue aprobado y está en el álbum</p>
+                        </div>
+                      )}
+                      {mySticker.status === 'pending' && (
+                        <p className="text-sm text-mundial-purple/50 font-condensed italic">Tu sticker está siendo revisado por el organizador.</p>
+                      )}
+                      {canEdit && (
+                        <button
+                          onClick={() => setSelectedSlotForEditor(myAssignedSlot)}
+                          className="px-6 py-2.5 rounded-xl bg-mundial-purple text-white text-sm font-condensed font-bold tracking-wider uppercase hover:bg-mundial-purple/90 transition-colors"
+                        >
+                          Editar sticker
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    /* Sin sticker aún — CTA de creación */
+                    <div
+                      onClick={() => setSelectedSlotForEditor(myAssignedSlot)}
+                      className="cursor-pointer group text-center py-14 bg-white rounded-2xl border-2 border-dashed border-mundial-purple/20 hover:border-mundial-purple/40 hover:bg-mundial-purple/5 transition-all space-y-3"
+                    >
+                      <div className="w-14 h-14 mx-auto rounded-2xl bg-mundial-purple/10 group-hover:bg-mundial-purple/15 flex items-center justify-center transition-colors">
+                        <svg className="w-7 h-7 text-mundial-purple/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                        </svg>
+                      </div>
+                      <p className="font-display text-base tracking-wider uppercase text-mundial-purple/60 group-hover:text-mundial-purple/80 transition-colors">Crear mi sticker</p>
+                      <p className="text-xs text-mundial-purple/35 font-condensed">Subí tu foto y personalizá tu sticker para el álbum</p>
+                    </div>
+                  )}
+                </div>
+              )
+            })()
           )}
         </div>
       )}

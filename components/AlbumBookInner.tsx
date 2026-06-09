@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useRef, useState } from 'react'
+import { forwardRef, useRef, useState, type ReactNode } from 'react'
 import HTMLFlipBook from 'react-pageflip'
 import type { AlbumSlot } from '@/lib/supabase'
 
@@ -185,6 +185,36 @@ const BlankPage = forwardRef<HTMLDivElement>(function BlankPage(_, ref) {
   )
 })
 
+/* ─── Build pages array (no conditional children) ─────────── */
+function buildBookPages({
+  portadaUrl, albumName, totalSlots, collectedCount,
+  slotChunks, bySlot, needsPadding, contraportadaUrl,
+}: {
+  portadaUrl: string | null
+  albumName: string
+  totalSlots: number
+  collectedCount: number
+  slotChunks: AlbumSlot[][]
+  bySlot: Map<string, Array<{ image_url: string }>>
+  needsPadding: boolean
+  contraportadaUrl: string | null
+}): ReactNode[] {
+  const pages: ReactNode[] = []
+  pages.push(
+    <CoverPage key="cover" url={portadaUrl} name={albumName} total={totalSlots} collected={collectedCount} />,
+  )
+  slotChunks.forEach((chunk, i) => {
+    pages.push(<FlipPage key={`slot-${i}`} slots={chunk} bySlot={bySlot} />)
+  })
+  if (needsPadding) {
+    pages.push(<BlankPage key="blank-pad" />)
+  }
+  pages.push(
+    <BackPage key="back" url={contraportadaUrl} total={totalSlots} collected={collectedCount} />,
+  )
+  return pages
+}
+
 /* ─── Main component ────────────────────────────────────────── */
 interface Props {
   slots: AlbumSlot[]
@@ -203,13 +233,20 @@ export default function AlbumBookInner({
   const bookRef = useRef<any>(null)
   const [currentPage, setCurrentPage] = useState(0)
 
-  // Chunk slots into pages
+  // Build pages array imperatively — react-pageflip uses React.Children.map + cloneElement
+  // internally, which throws if any child is null/false/undefined. Never use && or ternaries
+  // directly as JSX children of HTMLFlipBook; build a clean array instead (mirrors AlbumEscolar).
   const slotChunks: AlbumSlot[][] = []
   for (let i = 0; i < slots.length; i += SLOTS_PER_PAGE)
     slotChunks.push(slots.slice(i, i + SLOTS_PER_PAGE))
 
   const needsPadding = slotChunks.length % 2 !== 0
   const totalPages = 1 + slotChunks.length + (needsPadding ? 1 : 0) + 1
+
+  const bookPages = buildBookPages({
+    portadaUrl, albumName, totalSlots, collectedCount,
+    slotChunks, bySlot, needsPadding, contraportadaUrl,
+  })
 
   const pct = totalSlots > 0 ? Math.round((collectedCount / totalSlots) * 100) : 0
 
@@ -270,21 +307,7 @@ export default function AlbumBookInner({
             style={{}}
             onFlip={(e: { data: number }) => setCurrentPage(e.data)}
           >
-            <CoverPage
-              url={portadaUrl}
-              name={albumName}
-              total={totalSlots}
-              collected={collectedCount}
-            />
-            {slotChunks.map((chunk, i) => (
-              <FlipPage key={i} slots={chunk} bySlot={bySlot} />
-            ))}
-            {needsPadding && <BlankPage />}
-            <BackPage
-              url={contraportadaUrl}
-              total={totalSlots}
-              collected={collectedCount}
-            />
+            {bookPages}
           </HTMLFlipBook>
         </div>
 

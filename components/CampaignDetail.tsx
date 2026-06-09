@@ -29,7 +29,7 @@ interface PendingStickerMeta extends Sticker {
 
 export default function CampaignDetail({ album, currentUserId, canAssignAdmin, userRole, onBack }: Props) {
   const isAdminView = canAssignAdmin || userRole === 'admin'
-  const [tab, setTab] = useState<Tab>('participants')
+  const [tab, setTab] = useState<Tab>(isAdminView ? 'participants' : 'album')
 
   // ── Notificaciones ────────────────────────────────────────────────
   const [tabBadges, setTabBadges] = useState<TabBadgeCounts>({ stickers: 0, album: 0, trades: 0 })
@@ -745,7 +745,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
       <div className="flex flex-wrap gap-1 bg-mundial-cream rounded-xl p-1 w-fit">
         {(isAdminView
           ? ['participants', 'slots', 'invitations', 'stickers', 'review', 'album', 'gallery', 'trades', 'stats'] as Tab[]
-          : ['participants', 'slots', 'stickers', 'album', 'gallery', 'trades'] as Tab[]
+          : ['album'] as Tab[]
         ).map((t) => {
           const labels: Record<Tab, string> = {
             participants: 'Participantes', slots: 'Slots', invitations: 'Invitaciones',

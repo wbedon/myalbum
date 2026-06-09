@@ -745,11 +745,11 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
       <div className="flex flex-wrap gap-1 bg-mundial-cream rounded-xl p-1 w-fit">
         {(isAdminView
           ? ['participants', 'slots', 'invitations', 'stickers', 'review', 'album', 'gallery', 'trades', 'stats'] as Tab[]
-          : ['album'] as Tab[]
+          : ['album', 'stickers'] as Tab[]
         ).map((t) => {
           const labels: Record<Tab, string> = {
             participants: 'Participantes', slots: 'Slots', invitations: 'Invitaciones',
-            stickers: 'Mis Cromos', review: 'Revisión', album: 'Mi Álbum',
+            stickers: isAdminView ? 'Mis Cromos' : 'Mi Sticker', review: 'Revisión', album: 'Mi Álbum',
             gallery: 'Galería', trades: 'Intercambios', stats: 'Stats',
           }
           const badgeCount =
@@ -1050,8 +1050,10 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                       </svg>
                       <span className="font-condensed text-sm font-bold text-mundial-purple">
                         {mySticker
-                          ? `Tu cromo: ${statusConfig[mySticker.status]?.label ?? mySticker.status}`
-                          : 'Elegí un slot para crear tu cromo'}
+                          ? `Tu sticker: ${statusConfig[mySticker.status]?.label ?? mySticker.status}`
+                          : isAdminView
+                            ? 'Elegí un slot para crear tu cromo'
+                            : 'Elegí un slot y creá tu sticker personalizado para este álbum'}
                       </span>
                     </div>
 

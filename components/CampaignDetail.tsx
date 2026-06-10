@@ -1313,39 +1313,33 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                       <p className="font-display text-base tracking-wider uppercase text-mundial-purple/60 group-hover:text-mundial-purple/80 transition-colors">Crear mi sticker</p>
                       <p className="text-xs text-mundial-purple/35 font-condensed">Subí tu foto y personalizá tu sticker para el álbum</p>
                     </div>
-                  ) : (
-                    /* Sin sticker y sin slot asignado — grilla para elegir slot */
-                    slots.length === 0 ? (
-                      <div className="text-center py-14 bg-white rounded-2xl border-2 border-dashed border-mundial-purple/15 space-y-2">
-                        <p className="font-display text-base tracking-wider uppercase text-mundial-purple/50">Sin slots definidos</p>
-                        <p className="text-sm text-mundial-purple/35">El organizador todavía no creó los slots de esta campaña.</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {slots.map((slot) => (
-                          <div
-                            key={slot.id}
-                            onClick={() => setSelectedSlotForEditor(slot)}
-                            className="cursor-pointer group relative rounded-2xl border-2 border-dashed border-mundial-purple/15 bg-white/70 overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all duration-200"
-                          >
-                            <div className="aspect-[3/4] flex items-center justify-center bg-mundial-cream/50">
-                              <div className="text-center space-y-2">
-                                <div className="w-10 h-10 mx-auto rounded-xl bg-mundial-purple/10 group-hover:bg-mundial-purple/15 flex items-center justify-center transition-colors">
-                                  <span className="font-display text-lg text-mundial-purple font-bold">{slot.slot_number}</span>
-                                </div>
-                                <p className="text-xs text-mundial-purple/40 font-condensed font-bold">+ Crear</p>
-                              </div>
-                            </div>
-                            <div className="px-3 py-2 bg-white/90 border-t border-mundial-purple/10">
-                              <p className="font-display text-xs tracking-wide uppercase text-mundial-purple truncate">
-                                #{slot.slot_number}{slot.label ? ` ${slot.label}` : ''}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
+                  ) : (() => {
+                    /* Sin sticker y sin slot asignado — CTA único con primer slot libre */
+                    const freeSlot = slots.find(s => !s.assigned_user_id) ?? null
+                    if (!freeSlot) {
+                      return (
+                        <div className="text-center py-14 bg-white rounded-2xl border-2 border-dashed border-mundial-purple/15 space-y-2">
+                          <p className="font-display text-base tracking-wider uppercase text-mundial-purple/50">Sin slots disponibles</p>
+                          <p className="text-sm text-mundial-purple/35">El organizador todavía no creó slots en esta campaña.</p>
+                        </div>
+                      )
+                    }
+                    return (
+                      <div
+                        onClick={() => setSelectedSlotForEditor(freeSlot)}
+                        className="cursor-pointer group text-center py-14 bg-white rounded-2xl border-2 border-dashed border-mundial-purple/20 hover:border-mundial-purple/40 hover:bg-mundial-purple/5 transition-all space-y-3"
+                      >
+                        <div className="w-14 h-14 mx-auto rounded-2xl bg-mundial-purple/10 group-hover:bg-mundial-purple/15 flex items-center justify-center transition-colors">
+                          <svg className="w-7 h-7 text-mundial-purple/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                          </svg>
+                        </div>
+                        <p className="font-display text-base tracking-wider uppercase text-mundial-purple/60 group-hover:text-mundial-purple/80 transition-colors">Crear mi sticker</p>
+                        <p className="text-xs text-mundial-purple/35 font-condensed">Subí tu foto y personalizá tu sticker para el álbum</p>
                       </div>
                     )
-                  )}
+                  })()}
                 </div>
               )
             })()

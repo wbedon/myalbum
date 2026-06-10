@@ -404,6 +404,15 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
     setAssigningSlotFor(null)
   }, [album.id, fetchSlots])
 
+  const handleDeleteMySticker = useCallback(async (stickerId: string) => {
+    setDeletingSticker(true)
+    await supabase.from('stickers').delete().eq('id', stickerId)
+    setMyStickers([])
+    setMyStickersFetched(false)
+    setConfirmDeleteSticker(false)
+    setDeletingSticker(false)
+  }, [])
+
   // ── Invitaciones ─────────────────────────────────────────────────
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [invLoading, setInvLoading] = useState(false)
@@ -423,6 +432,8 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   const [myStickers, setMyStickers] = useState<Sticker[]>([])
   const [myStickersFetched, setMyStickersFetched] = useState(false)
   const [selectedSlotForEditor, setSelectedSlotForEditor] = useState<AlbumSlot | null>(null)
+  const [deletingSticker, setDeletingSticker] = useState(false)
+  const [confirmDeleteSticker, setConfirmDeleteSticker] = useState(false)
 
   // ── Revisión (admin) ──────────────────────────────────────────────
   const [pendingStickers, setPendingStickers] = useState<PendingStickerMeta[]>([])
@@ -1250,14 +1261,42 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                       {mySticker.status === 'pending' && (
                         <p className="text-sm text-mundial-purple/50 font-condensed italic">Tu sticker está siendo revisado por el organizador.</p>
                       )}
-                      {canEdit && editorSlot && (
-                        <button
-                          onClick={() => setSelectedSlotForEditor(editorSlot)}
-                          className="px-6 py-2.5 rounded-xl bg-mundial-purple text-white text-sm font-condensed font-bold tracking-wider uppercase hover:bg-mundial-purple/90 transition-colors"
-                        >
-                          Editar sticker
-                        </button>
-                      )}
+                      <div className="flex items-center gap-3">
+                        {canEdit && editorSlot && (
+                          <button
+                            onClick={() => setSelectedSlotForEditor(editorSlot)}
+                            className="px-6 py-2.5 rounded-xl bg-mundial-purple text-white text-sm font-condensed font-bold tracking-wider uppercase hover:bg-mundial-purple/90 transition-colors"
+                          >
+                            Editar sticker
+                          </button>
+                        )}
+                        {mySticker.status !== 'approved' && (
+                          confirmDeleteSticker ? (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleDeleteMySticker(mySticker.id)}
+                                disabled={deletingSticker}
+                                className="px-4 py-2.5 rounded-xl bg-mundial-red text-white text-sm font-condensed font-bold tracking-wider uppercase hover:bg-mundial-red/90 transition-colors disabled:opacity-50"
+                              >
+                                {deletingSticker ? 'Eliminando…' : '¿Confirmar?'}
+                              </button>
+                              <button
+                                onClick={() => setConfirmDeleteSticker(false)}
+                                className="px-4 py-2.5 rounded-xl border border-mundial-purple/20 text-mundial-purple/60 text-sm font-condensed font-bold tracking-wider uppercase hover:bg-mundial-purple/5 transition-colors"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmDeleteSticker(true)}
+                              className="px-4 py-2.5 rounded-xl border border-mundial-red/30 text-mundial-red/70 text-sm font-condensed font-bold tracking-wider uppercase hover:bg-mundial-red/8 hover:border-mundial-red/50 hover:text-mundial-red transition-colors"
+                            >
+                              Eliminar
+                            </button>
+                          )
+                        )}
+                      </div>
                     </div>
                   ) : editorSlot ? (
                     /* Sin sticker, slot conocido — CTA directo */

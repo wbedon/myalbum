@@ -1182,10 +1182,13 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
               )
             })()
           ) : (
-            /* ── Vista participante: slot asignado único ── */
+            /* ── Vista participante ── */
             (() => {
               const mySticker = myStickers[0] ?? null
               const myAssignedSlot = slotsFetched ? (slots.find(s => s.assigned_user_id === currentUserId) ?? null) : undefined
+              // Si tiene sticker pero sin asignación, recuperar el slot por slot_id del sticker
+              const stickerSlot = mySticker ? (slots.find(s => s.id === mySticker.slot_id) ?? null) : null
+              const editorSlot = myAssignedSlot ?? stickerSlot
               const statusConfig: Record<string, { label: string; dot: string; bg: string; border: string }> = {
                 draft:    { label: 'Borrador',    dot: 'bg-mundial-yellow-dark', bg: 'bg-mundial-yellow/10',  border: 'border-mundial-yellow/30' },
                 pending:  { label: 'En revisión', dot: 'bg-mundial-purple',      bg: 'bg-mundial-purple/10', border: 'border-mundial-purple/25' },
@@ -1197,38 +1200,30 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                 return <div className="h-56 rounded-2xl bg-mundial-cream animate-pulse" />
               }
 
-              if (!myAssignedSlot) {
-                return (
-                  <div className="text-center py-16 bg-white rounded-2xl border-2 border-dashed border-mundial-purple/15 space-y-3">
-                    <div className="w-14 h-14 mx-auto rounded-2xl bg-mundial-purple/8 flex items-center justify-center">
-                      <svg className="w-7 h-7 text-mundial-purple/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
-                      </svg>
-                    </div>
-                    <p className="font-display text-base tracking-wider uppercase text-mundial-purple/50">Sin slot asignado</p>
-                    <p className="text-sm text-mundial-purple/35 max-w-xs mx-auto">El organizador aún no te asignó un slot en este álbum.</p>
-                  </div>
-                )
-              }
-
               const cfg = mySticker ? statusConfig[mySticker.status] : null
               const canEdit = !mySticker || mySticker.status === 'draft' || mySticker.status === 'rejected'
 
               return (
                 <div className="space-y-4">
-                  {/* Badge de slot asignado */}
-                  <div className="flex items-center gap-2 px-4 py-2 bg-mundial-purple/8 border border-mundial-purple/15 rounded-xl w-fit">
-                    <span className="font-condensed text-[11px] font-bold tracking-[0.25em] uppercase text-mundial-purple/50">Slot asignado</span>
-                    <span className="font-display text-sm font-bold tracking-wider text-mundial-purple">
-                      #{myAssignedSlot.slot_number}{myAssignedSlot.label ? ` · ${myAssignedSlot.label}` : ''}
-                    </span>
-                    {cfg && (
-                      <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-condensed font-bold tracking-wider uppercase ${cfg.bg} ${cfg.border} border text-mundial-purple/70`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                        {cfg.label}
+                  {/* Badge: slot asignado o sin slot */}
+                  {myAssignedSlot ? (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-mundial-purple/8 border border-mundial-purple/15 rounded-xl w-fit">
+                      <span className="font-condensed text-[11px] font-bold tracking-[0.25em] uppercase text-mundial-purple/50">Slot asignado</span>
+                      <span className="font-display text-sm font-bold tracking-wider text-mundial-purple">
+                        #{myAssignedSlot.slot_number}{myAssignedSlot.label ? ` · ${myAssignedSlot.label}` : ''}
                       </span>
-                    )}
-                  </div>
+                      {cfg && (
+                        <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-condensed font-bold tracking-wider uppercase ${cfg.bg} ${cfg.border} border text-mundial-purple/70`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                          {cfg.label}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-mundial-yellow/10 border border-mundial-yellow/30 rounded-xl w-fit">
+                      <span className="font-condensed text-[11px] font-bold tracking-[0.25em] uppercase text-mundial-yellow-dark">Sin slot asignado</span>
+                    </div>
+                  )}
 
                   {mySticker ? (
                     /* Sticker existente */
@@ -1255,19 +1250,19 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                       {mySticker.status === 'pending' && (
                         <p className="text-sm text-mundial-purple/50 font-condensed italic">Tu sticker está siendo revisado por el organizador.</p>
                       )}
-                      {canEdit && (
+                      {canEdit && editorSlot && (
                         <button
-                          onClick={() => setSelectedSlotForEditor(myAssignedSlot)}
+                          onClick={() => setSelectedSlotForEditor(editorSlot)}
                           className="px-6 py-2.5 rounded-xl bg-mundial-purple text-white text-sm font-condensed font-bold tracking-wider uppercase hover:bg-mundial-purple/90 transition-colors"
                         >
                           Editar sticker
                         </button>
                       )}
                     </div>
-                  ) : (
-                    /* Sin sticker aún — CTA de creación */
+                  ) : editorSlot ? (
+                    /* Sin sticker, slot conocido — CTA directo */
                     <div
-                      onClick={() => setSelectedSlotForEditor(myAssignedSlot)}
+                      onClick={() => setSelectedSlotForEditor(editorSlot)}
                       className="cursor-pointer group text-center py-14 bg-white rounded-2xl border-2 border-dashed border-mundial-purple/20 hover:border-mundial-purple/40 hover:bg-mundial-purple/5 transition-all space-y-3"
                     >
                       <div className="w-14 h-14 mx-auto rounded-2xl bg-mundial-purple/10 group-hover:bg-mundial-purple/15 flex items-center justify-center transition-colors">
@@ -1279,6 +1274,38 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                       <p className="font-display text-base tracking-wider uppercase text-mundial-purple/60 group-hover:text-mundial-purple/80 transition-colors">Crear mi sticker</p>
                       <p className="text-xs text-mundial-purple/35 font-condensed">Subí tu foto y personalizá tu sticker para el álbum</p>
                     </div>
+                  ) : (
+                    /* Sin sticker y sin slot asignado — grilla para elegir slot */
+                    slots.length === 0 ? (
+                      <div className="text-center py-14 bg-white rounded-2xl border-2 border-dashed border-mundial-purple/15 space-y-2">
+                        <p className="font-display text-base tracking-wider uppercase text-mundial-purple/50">Sin slots definidos</p>
+                        <p className="text-sm text-mundial-purple/35">El organizador todavía no creó los slots de esta campaña.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {slots.map((slot) => (
+                          <div
+                            key={slot.id}
+                            onClick={() => setSelectedSlotForEditor(slot)}
+                            className="cursor-pointer group relative rounded-2xl border-2 border-dashed border-mundial-purple/15 bg-white/70 overflow-hidden hover:shadow-lg hover:scale-[1.02] transition-all duration-200"
+                          >
+                            <div className="aspect-[3/4] flex items-center justify-center bg-mundial-cream/50">
+                              <div className="text-center space-y-2">
+                                <div className="w-10 h-10 mx-auto rounded-xl bg-mundial-purple/10 group-hover:bg-mundial-purple/15 flex items-center justify-center transition-colors">
+                                  <span className="font-display text-lg text-mundial-purple font-bold">{slot.slot_number}</span>
+                                </div>
+                                <p className="text-xs text-mundial-purple/40 font-condensed font-bold">+ Crear</p>
+                              </div>
+                            </div>
+                            <div className="px-3 py-2 bg-white/90 border-t border-mundial-purple/10">
+                              <p className="font-display text-xs tracking-wide uppercase text-mundial-purple truncate">
+                                #{slot.slot_number}{slot.label ? ` ${slot.label}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
                   )}
                 </div>
               )

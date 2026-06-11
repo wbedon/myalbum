@@ -54,12 +54,17 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
   const [playerName, setPlayerName] = useState<string>('')
   const [clubName, setClubName] = useState<string>('')
 
+  const [isRestoredEdit, setIsRestoredEdit] = useState(false)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const origUrlRef = useRef<string | null>(null)
   const procUrlRef = useRef<string | null>(null)
   const transformRef = useRef<Transform | null>(null)
+  // Pending restore values — consumed by template/uniform useEffects to avoid overwrite
+  const pendingTransformRef = useRef<{ transform: Transform; crop: CropBox } | null>(null)
+  const pendingUniformRef   = useRef<{ transform: Transform | null; crop: CropBox } | null>(null)
 
   useEffect(() => {
     setHasCameraSupport(!!(navigator.mediaDevices?.getUserMedia))
@@ -79,8 +84,62 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
     }
   }, [])
 
+  // Restore editor state from saved sticker (if cutout_url exists)
+  useEffect(() => {
+    if (!existingSticker?.cutout_url) return
+    ;(async () => {
+      try {
+        const resp = await fetch(existingSticker.cutout_url!)
+        if (!resp.ok) return
+        const blob = await resp.blob()
+        const url = URL.createObjectURL(blob)
+        origUrlRef.current = url
+        procUrlRef.current = url
+        setOriginalUrl(url)
+        setProcessedUrl(url)
+        setProcessedBlob(blob)
+        setPlayerName(existingSticker.player_name ?? '')
+        setClubName(existingSticker.club_name ?? '')
+        setWithUniform(existingSticker.with_uniform ?? true)
+        if (existingSticker.template_id) {
+          const { data: tpl } = await supabase.from('templates').select('*').eq('id', existingSticker.template_id).single()
+          if (tpl) {
+            if (existingSticker.sticker_transform) {
+              pendingTransformRef.current = {
+                transform: existingSticker.sticker_transform as Transform,
+                crop: (existingSticker.sticker_crop as CropBox) ?? { x: 0, y: 0, w: 1, h: 1 },
+              }
+            }
+            if (existingSticker.uniform_transform) {
+              pendingUniformRef.current = {
+                transform: existingSticker.uniform_transform as Transform,
+                crop: (existingSticker.uniform_crop as CropBox) ?? { x: 0, y: 0, w: 1, h: 1 },
+              }
+            }
+            setSelectedTemplate(tpl as Template)
+          }
+        } else if (existingSticker.sticker_transform) {
+          setTransform(existingSticker.sticker_transform as Transform)
+          setCrop((existingSticker.sticker_crop as CropBox) ?? { x: 0, y: 0, w: 1, h: 1 })
+        }
+        setIsRestoredEdit(true)
+        setStage('done')
+      } catch {
+        // Restore failed — stay in idle so user can upload a new photo
+      }
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingSticker?.id])
+
   useEffect(() => {
     if (!selectedTemplate) { setTransform(null); return }
+    const pending = pendingTransformRef.current
+    if (pending) {
+      pendingTransformRef.current = null
+      setTransform(pending.transform)
+      setCrop(pending.crop)
+      return
+    }
     const sa = selectedTemplate.safe_area
     setTransform(sa ? { x: sa.x, y: sa.y, width: sa.width } : { x: 0, y: 0, width: 1 })
     setCrop({ x: 0, y: 0, w: 1, h: 1 })
@@ -101,6 +160,13 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
 
   useEffect(() => {
     if (!selectedUniform) { setUniformTransform(null); setUniformCrop({ x: 0, y: 0, w: 1, h: 1 }); return }
+    const pending = pendingUniformRef.current
+    if (pending) {
+      pendingUniformRef.current = null
+      setUniformTransform(pending.transform)
+      setUniformCrop(pending.crop)
+      return
+    }
     const t = transformRef.current
     setUniformTransform(t ? { x: t.x, y: t.y + 0.30, width: t.width } : { x: 0.05, y: 0.35, width: 0.9 })
     setUniformCrop({ x: 0, y: 0, w: 1, h: 1 })
@@ -210,11 +276,35 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
 
       const { data: { publicUrl } } = supabase.storage.from('stickers').getPublicUrl(path)
 
+      // Upload cutout (background-removed) for future editor restore
+      let cutoutPublicUrl: string | null = null
+      if (processedBlob) {
+        const cutoutPath = `${albumId}/${slot.id}/${currentUserId}_cutout.png`
+        const { error: cutoutErr } = await supabase.storage
+          .from('stickers')
+          .upload(cutoutPath, processedBlob, { contentType: 'image/png', upsert: true })
+        if (!cutoutErr) {
+          cutoutPublicUrl = supabase.storage.from('stickers').getPublicUrl(cutoutPath).data.publicUrl
+        }
+      }
+
+      const editMeta = {
+        cutout_url:        cutoutPublicUrl,
+        template_id:       selectedTemplate?.id ?? null,
+        player_name:       playerName.trim() || null,
+        club_name:         clubName.trim() || null,
+        with_uniform:      withUniform,
+        sticker_transform: transform ?? null,
+        sticker_crop:      crop,
+        uniform_transform: withUniform ? (uniformTransform ?? null) : null,
+        uniform_crop:      withUniform ? uniformCrop : null,
+      }
+
       let resultSticker: Sticker
       if (existingSticker) {
         const { data, error: dbErr } = await supabase
           .from('stickers')
-          .update({ image_url: publicUrl, status: mode, rejection_reason: null })
+          .update({ image_url: publicUrl, status: mode, rejection_reason: null, ...editMeta })
           .eq('id', existingSticker.id)
           .select()
           .single()
@@ -223,7 +313,7 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
       } else {
         const { data, error: dbErr } = await supabase
           .from('stickers')
-          .insert({ album_id: albumId, slot_id: slot.id, user_id: currentUserId, image_url: publicUrl, status: mode })
+          .insert({ album_id: albumId, slot_id: slot.id, user_id: currentUserId, image_url: publicUrl, status: mode, ...editMeta })
           .select()
           .single()
         if (dbErr) throw dbErr
@@ -241,14 +331,14 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
       setIsSaving(false)
       setSaveMode(null)
     }
-  }, [processedBlob, processedUrl, selectedTemplate, transform, crop, playerName, clubName, selectedUniform, uniformTransform, uniformCrop, withUniform, albumId, slot, currentUserId, existingSticker, onSave])
+  }, [processedBlob, processedUrl, selectedTemplate, transform, crop, playerName, clubName, selectedUniform, uniformTransform, uniformCrop, withUniform, albumId, slot, currentUserId, existingSticker, onSave])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleReset = useCallback(() => {
     setStage('idle'); setOriginalUrl(null); setProcessedUrl(null); setProcessedBlob(null)
     setError(null); setProgressPct(0); setSelectedTemplate(null); setSelectedUniform(null)
     setWithUniform(true); setTransform(null); setCrop({ x: 0, y: 0, w: 1, h: 1 })
     setUniformTransform(null); setUniformCrop({ x: 0, y: 0, w: 1, h: 1 })
-    setPlayerName(''); setClubName(''); setCameraError(null)
+    setPlayerName(''); setClubName(''); setCameraError(null); setIsRestoredEdit(false)
   }, [])
 
   const startStream = useCallback(async (deviceId?: string) => {
@@ -511,7 +601,7 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
           {/* Preview */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <p className="font-display text-xs text-mundial-purple/60 uppercase tracking-[0.2em] mb-2">Original</p>
+              <p className="font-display text-xs text-mundial-purple/60 uppercase tracking-[0.2em] mb-2">{isRestoredEdit ? 'Recorte guardado' : 'Original'}</p>
               <div className="rounded-2xl overflow-hidden border-2 border-mundial-purple/10 bg-mundial-cream aspect-square">
                 <img src={originalUrl} alt="Original" className="w-full h-full object-contain" />
               </div>
@@ -628,7 +718,7 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
               onClick={handleReset}
               className="px-4 py-3 text-mundial-purple/50 hover:text-mundial-purple font-display text-sm tracking-wider uppercase rounded-xl hover:bg-mundial-purple/5 transition-colors"
             >
-              Otra foto
+              {isRestoredEdit ? 'Cambiar foto' : 'Otra foto'}
             </button>
           </div>
         </div>

@@ -131,6 +131,16 @@ export type Sticker = {
   rejection_reason: string | null
   created_at: string
   updated_at: string
+  // edit metadata — saved to restore editor state
+  cutout_url:        string | null
+  template_id:       string | null
+  player_name:       string | null
+  club_name:         string | null
+  with_uniform:      boolean
+  sticker_transform: { x: number; y: number; width: number } | null
+  sticker_crop:      { x: number; y: number; w: number; h: number } | null
+  uniform_transform: { x: number; y: number; width: number } | null
+  uniform_crop:      { x: number; y: number; w: number; h: number } | null
 }
 
 export type TradeOffer = {

@@ -379,7 +379,7 @@ body{font-family:Arial,sans-serif;background:#fff;color:#3D2761}
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full space-y-5 shadow-2xl">
             <div className="text-center space-y-1">
               <p className="font-display text-2xl tracking-wide uppercase text-mundial-purple">¡Sobre abierto!</p>
-              <p className="text-sm text-mundial-purple/50">{revealed.length} cromo{revealed.length !== 1 ? 's' : ''} obtenido{revealed.length !== 1 ? 's' : ''}</p>
+              <p className="text-sm text-mundial-purple/50">{revealed.length} sticker{revealed.length !== 1 ? 's' : ''} obtenido{revealed.length !== 1 ? 's' : ''}</p>
             </div>
             <div className="grid grid-cols-3 gap-3">
               {revealed.map((s, i) => (

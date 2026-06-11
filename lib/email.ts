@@ -117,8 +117,8 @@ export async function sendEmail(params: SendEmailParams): Promise<{ sent: boolea
 // ── Asuntos ───────────────────────────────────────────────────────────────────
 
 export const NOTIFICATION_SUBJECTS: Record<string, string> = {
-  sticker_approved: '✅ Tu cromo fue aprobado — MyAlbum',
-  sticker_rejected: '❌ Tu cromo fue rechazado — MyAlbum',
+  sticker_approved: '✅ Tu sticker fue aprobado — MyAlbum',
+  sticker_rejected: '❌ Tu sticker fue rechazado — MyAlbum',
   trade_requested:  '🔄 Solicitud de intercambio — MyAlbum',
   trade_accepted:   '🎉 Intercambio aceptado — MyAlbum',
   pack_available:   '📦 Tenés sobres nuevos — MyAlbum',
@@ -135,21 +135,21 @@ export function buildNotificationHtml(type: string, payload: Payload): string {
 
   const bodies: Record<string, string> = {
     sticker_approved:
-      `¡Tu cromo para el slot <strong>${slot}</strong> fue aprobado y ya está visible en el álbum!`,
+      `¡Tu sticker para el slot <strong>${slot}</strong> fue aprobado y ya está visible en el álbum!`,
     sticker_rejected:
-      `Tu cromo para el slot <strong>${slot}</strong> fue rechazado` +
+      `Tu sticker para el slot <strong>${slot}</strong> fue rechazado` +
       (payload.rejection_reason ? `: <em>${payload.rejection_reason}</em>` : '.') +
       ' Podés enviar uno nuevo desde la app.',
     trade_requested:
-      `<strong>${payload.requester_username}</strong> quiere intercambiar su cromo ` +
+      `<strong>${payload.requester_username}</strong> quiere intercambiar su sticker ` +
       `<strong>${payload.req_slot_label || '#' + payload.req_slot_number}</strong> por ` +
-      `tu cromo <strong>${payload.offer_slot_label || '#' + payload.offer_slot_number}</strong>. ` +
+      `tu sticker <strong>${payload.offer_slot_label || '#' + payload.offer_slot_number}</strong>. ` +
       `Revisá la propuesta en la app.`,
     trade_accepted:
       `<strong>${payload.offerer_username}</strong> aceptó tu solicitud. ` +
-      `Ya tenés el cromo <strong>${payload.got_slot_label || '#' + payload.got_slot_number}</strong> en tu colección.`,
+      `Ya tenés el sticker <strong>${payload.got_slot_label || '#' + payload.got_slot_number}</strong> en tu colección.`,
     pack_available:
-      `Hay un sobre con <strong>${payload.pack_size} cromo${Number(payload.pack_size) !== 1 ? 's' : ''}</strong> esperándote. ¡Ábrelo ahora!`,
+      `Hay un sobre con <strong>${payload.pack_size} sticker${Number(payload.pack_size) !== 1 ? 's' : ''}</strong> esperándote. ¡Ábrelo ahora!`,
   }
 
   return buildBaseHtml(bodies[type] ?? 'Tenés una nueva notificación en MyAlbum.', 'Abrir app', APP_URL)

@@ -782,7 +782,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
         ).map((t) => {
           const labels: Record<Tab, string> = {
             participants: 'Participantes', slots: 'Slots', invitations: 'Invitaciones',
-            stickers: isAdminView ? 'Mis Cromos' : 'Mi Sticker', review: 'Revisión', album: 'Mi Álbum',
+            stickers: isAdminView ? 'Mis Stickers' : 'Mi Sticker', review: 'Revisión', album: 'Mi Álbum',
             gallery: 'Galería', trades: 'Intercambios', stats: 'Stats',
           }
           const badgeCount =
@@ -1071,7 +1071,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
         </div>
       )}
 
-      {/* ── Tab: Mis Cromos ───────────────────────────────────────── */}
+      {/* ── Tab: Mis Stickers ────────────────────────────────────── */}
       {tab === 'stickers' && (
         <div className="space-y-5">
           {selectedSlotForEditor ? (
@@ -1082,6 +1082,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
               existingSticker={myStickers.find((s) => s.slot_id === selectedSlotForEditor.id) ?? null}
               onSave={handleStickerSaved}
               onClose={() => setSelectedSlotForEditor(null)}
+              hideSlotLabel={!isAdminView && !slots.find(s => s.id === selectedSlotForEditor.id && s.assigned_user_id === currentUserId)}
             />
           ) : isAdminView ? (
             /* ── Vista admin: grilla completa de slots ── */
@@ -1102,8 +1103,8 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                     </svg>
                     <span className="font-condensed text-sm font-bold text-mundial-purple">
                       {mySticker
-                        ? `Tu cromo: ${statusConfig[mySticker.status]?.label ?? mySticker.status}`
-                        : 'Elegí un slot para crear tu cromo'}
+                        ? `Tu sticker: ${statusConfig[mySticker.status]?.label ?? mySticker.status}`
+                        : 'Elegí un slot para crear tu sticker'}
                     </span>
                   </div>
                   {(slotsLoading || !myStickersFetched) ? (
@@ -1171,7 +1172,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                                 </div>
                               ) : (
                                 <p className="text-[10px] font-condensed font-bold tracking-wider uppercase text-mundial-purple/35">
-                                  {isLocked ? 'Bloqueado' : 'Sin cromo'}
+                                  {isLocked ? 'Bloqueado' : 'Sin sticker'}
                                 </p>
                               )}
                             </div>
@@ -1356,7 +1357,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span className="font-condensed text-sm font-bold text-mundial-purple">
-              {pendingStickers.length} cromo{pendingStickers.length !== 1 ? 's' : ''} esperando revisión
+              {pendingStickers.length} sticker{pendingStickers.length !== 1 ? 's' : ''} esperando revisión
             </span>
           </div>
 
@@ -1537,7 +1538,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
               </div>
               <div className="space-y-1.5">
                 <label className="font-condensed text-[10px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
-                  Cromos por sobre
+                  Stickers por sobre
                 </label>
                 <input
                   type="number"
@@ -1611,7 +1612,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                     { label: 'Participantes', value: stats.total_members },
                     { label: 'Slots',         value: stats.total_slots   },
                     { label: 'Slots cubiertos', value: stats.slots_covered },
-                    { label: 'Cromos total',  value: Object.values(stats.stickers_by_status).reduce((a, b) => a + b, 0) },
+                    { label: 'Stickers total',  value: Object.values(stats.stickers_by_status).reduce((a, b) => a + b, 0) },
                   ].map(({ label, value }) => (
                     <div key={label} className="bg-mundial-cream rounded-xl p-3 text-center space-y-0.5">
                       <p className="font-display text-2xl text-mundial-purple">{value}</p>
@@ -1621,10 +1622,10 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                 </div>
               </div>
 
-              {/* Cromos por estado */}
+              {/* Stickers por estado */}
               <div className="glass-card rounded-2xl p-5 space-y-3">
                 <h3 className="font-condensed text-[11px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
-                  Cromos por estado
+                  Stickers por estado
                 </h3>
                 <div className="flex flex-wrap gap-3">
                   {([

@@ -30,9 +30,9 @@ interface AchievementDef {
 }
 
 const ACHIEVEMENT_DEFS: AchievementDef[] = [
-  { type: 'first_sticker_submitted', emoji: '✏️', title: 'Primer Cromo',     desc: 'Enviaste tu primer cromo a revisión'  },
-  { type: 'first_sticker_approved',  emoji: '🎨', title: 'Aprobado',         desc: 'Tu primer cromo fue aprobado'         },
-  { type: 'sticker_approved_5',      emoji: '⭐', title: 'Artista',          desc: '5 cromos aprobados en total'          },
+  { type: 'first_sticker_submitted', emoji: '✏️', title: 'Primer Sticker',   desc: 'Enviaste tu primer sticker a revisión' },
+  { type: 'first_sticker_approved',  emoji: '🎨', title: 'Aprobado',         desc: 'Tu primer sticker fue aprobado'        },
+  { type: 'sticker_approved_5',      emoji: '⭐', title: 'Artista',          desc: '5 stickers aprobados en total'         },
   { type: 'first_pack_opened',       emoji: '🎁', title: 'Primer Sobre',     desc: 'Abriste tu primer sobre'              },
   { type: 'first_card_collected',    emoji: '📸', title: 'Coleccionista',    desc: 'Primera carta en tu colección'        },
   { type: 'collector_10',            emoji: '📚', title: 'Gran Colección',   desc: '10 cartas en tu colección'            },
@@ -238,7 +238,7 @@ export default function UserProfileModal({ userId, currentUserId, onClose }: Pro
                 <div className="flex flex-col items-center gap-1 px-2 py-3 bg-mundial-purple/5 rounded-2xl">
                   <span className="font-display text-2xl text-mundial-purple">{stats.stickers_approved}</span>
                   <span className="font-condensed text-[9px] font-bold tracking-[0.15em] uppercase text-mundial-purple/50 text-center leading-tight">
-                    Cromos<br/>aprobados
+                    Stickers<br/>aprobados
                   </span>
                 </div>
                 <div className="flex flex-col items-center gap-1 px-2 py-3 bg-mundial-yellow/10 rounded-2xl">

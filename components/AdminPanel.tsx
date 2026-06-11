@@ -200,7 +200,7 @@ export default function AdminPanel({ userId }: Props) {
             </div>
             <div className="space-y-1.5">
               <label className="block font-display text-xs text-mundial-purple/70 uppercase tracking-[0.2em]">
-                Cromos por sobre
+                Stickers por sobre
               </label>
               <div className="flex items-center gap-3">
                 <input
@@ -211,7 +211,7 @@ export default function AdminPanel({ userId }: Props) {
                   onChange={(e) => setPackSize(Number(e.target.value))}
                   className="w-24 px-4 py-3 rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple focus:outline-none focus:border-mundial-green focus:ring-2 focus:ring-mundial-green/20 transition-colors"
                 />
-                <span className="text-sm text-mundial-purple/50">cromos aleatorios incluidos en cada sobre</span>
+                <span className="text-sm text-mundial-purple/50">stickers aleatorios incluidos en cada sobre</span>
               </div>
             </div>
             <div className="space-y-1.5">

@@ -30,7 +30,7 @@ const CoverPage = forwardRef<
           {name}
         </h2>
         <div className="mt-6 px-4 py-1.5 rounded-full border border-white/40 bg-black/30 backdrop-blur-sm text-sm text-white/90 font-condensed font-bold">
-          {collected} / {total} cromos
+          {collected} / {total} stickers
         </div>
         <p className="absolute bottom-5 font-condensed text-[9px] tracking-[0.3em] uppercase text-white/35">
           myalbum · mundial 2026
@@ -71,7 +71,7 @@ const BackPage = forwardRef<
           />
         </div>
         <p className="text-center text-[10px] italic text-white/35 max-w-[180px] leading-relaxed">
-          "Cada cromo cuenta una historia. ¡Sigue coleccionando!"
+          "Cada sticker cuenta una historia. ¡Sigue coleccionando!"
         </p>
       </div>
     </div>

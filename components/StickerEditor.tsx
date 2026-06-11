@@ -24,9 +24,10 @@ interface Props {
   existingSticker: Sticker | null
   onSave: (sticker: Sticker) => void
   onClose: () => void
+  hideSlotLabel?: boolean
 }
 
-export default function StickerEditor({ albumId, slot, currentUserId, existingSticker, onSave, onClose }: Props) {
+export default function StickerEditor({ albumId, slot, currentUserId, existingSticker, onSave, onClose, hideSlotLabel = false }: Props) {
   const [stage, setStage] = useState<Stage>('idle')
   const [originalUrl, setOriginalUrl] = useState<string | null>(null)
   const [processedUrl, setProcessedUrl] = useState<string | null>(null)
@@ -243,10 +244,12 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
           </svg>
         </button>
         <div>
-          <p className="font-condensed text-[10px] font-bold tracking-[0.25em] uppercase text-mundial-purple/40">Editando cromo</p>
-          <h3 className="font-display text-lg tracking-wide uppercase text-mundial-purple">
-            Slot {slot.slot_number}{slot.label ? ` · ${slot.label}` : ''}
-          </h3>
+          <p className="font-condensed text-[10px] font-bold tracking-[0.25em] uppercase text-mundial-purple/40">Editando sticker</p>
+          {!hideSlotLabel && (
+            <h3 className="font-display text-lg tracking-wide uppercase text-mundial-purple">
+              Slot {slot.slot_number}{slot.label ? ` · ${slot.label}` : ''}
+            </h3>
+          )}
         </div>
       </div>
 
@@ -260,7 +263,7 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
         ].join(' ')}>
           <img src={existingSticker.image_url} alt="" className="w-16 h-20 object-contain rounded-lg border border-mundial-purple/10 bg-white shrink-0" />
           <div className="min-w-0">
-            <p className="font-condensed text-[10px] font-bold tracking-[0.2em] uppercase text-mundial-purple/50">Cromo actual</p>
+            <p className="font-condensed text-[10px] font-bold tracking-[0.2em] uppercase text-mundial-purple/50">Sticker actual</p>
             {existingSticker.rejection_reason && (
               <p className="text-xs text-mundial-red mt-1">
                 <span className="font-bold">Rechazado:</span> {existingSticker.rejection_reason}

@@ -40,17 +40,17 @@ function notifMessage(n: Notification): string {
   const p = n.payload as Record<string, unknown>
   switch (n.type) {
     case 'sticker_approved':
-      return `Tu cromo para el slot #${p.slot_number}${p.slot_label ? ` (${p.slot_label})` : ''} fue aprobado.`
+      return `Tu sticker para el slot #${p.slot_number}${p.slot_label ? ` (${p.slot_label})` : ''} fue aprobado.`
     case 'sticker_rejected': {
       const reason = p.rejection_reason ? ` Motivo: ${p.rejection_reason}` : ''
-      return `Tu cromo para el slot #${p.slot_number}${p.slot_label ? ` (${p.slot_label})` : ''} fue rechazado.${reason}`
+      return `Tu sticker para el slot #${p.slot_number}${p.slot_label ? ` (${p.slot_label})` : ''} fue rechazado.${reason}`
     }
     case 'trade_requested':
       return `${p.requester_username} quiere intercambiar: te ofrece slot #${p.req_slot_number}${p.req_slot_label ? ` (${p.req_slot_label})` : ''} por tu slot #${p.offer_slot_number}${p.offer_slot_label ? ` (${p.offer_slot_label})` : ''}.`
     case 'trade_accepted':
       return `${p.offerer_username} aceptó tu solicitud. Recibiste slot #${p.got_slot_number}${p.got_slot_label ? ` (${p.got_slot_label})` : ''}.`
     case 'pack_available':
-      return `¡Tienes un sobre disponible con ${p.pack_size} cromos! Ábrelo en Mi Álbum.`
+      return `¡Tienes un sobre disponible con ${p.pack_size} stickers! Ábrelo en Mi Álbum.`
   }
 }
 

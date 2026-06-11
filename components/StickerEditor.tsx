@@ -36,6 +36,8 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
   const [showCamera, setShowCamera] = useState(false)
   const [hasCameraSupport, setHasCameraSupport] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([])
+  const [cameraIndex, setCameraIndex] = useState(0)
   const [progressPct, setProgressPct] = useState(0)
   const [progressLabel, setProgressLabel] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -248,16 +250,43 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
     setPlayerName(''); setClubName(''); setCameraError(null)
   }, [])
 
+  const startStream = useCallback(async (deviceId?: string) => {
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    const constraint = deviceId ? { video: { deviceId: { exact: deviceId } } } : { video: true }
+    const stream = await navigator.mediaDevices.getUserMedia(constraint)
+    streamRef.current = stream
+    if (videoRef.current) videoRef.current.srcObject = stream
+    return stream
+  }, [])
+
   const openCamera = useCallback(async () => {
     setCameraError(null)
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true })
-      streamRef.current = stream
+      const stream = await startStream()
+      // Enumerate cameras after permission is granted (labels are available then)
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const videoDevices = devices.filter(d => d.kind === 'videoinput')
+      setCameras(videoDevices)
+      // Identify which index is the current stream's track
+      const currentId = stream.getVideoTracks()[0]?.getSettings().deviceId
+      const idx = videoDevices.findIndex(d => d.deviceId === currentId)
+      setCameraIndex(idx >= 0 ? idx : 0)
       setShowCamera(true)
     } catch {
       setCameraError('No se pudo acceder a la cámara. Verificá los permisos del navegador.')
     }
-  }, [])
+  }, [startStream])
+
+  const switchCamera = useCallback(async () => {
+    if (cameras.length < 2) return
+    const next = (cameraIndex + 1) % cameras.length
+    setCameraIndex(next)
+    try {
+      await startStream(cameras[next].deviceId)
+    } catch {
+      setCameraError('No se pudo cambiar la cámara.')
+    }
+  }, [cameras, cameraIndex, startStream])
 
   const closeCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach(t => t.stop())
@@ -344,6 +373,18 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
                   <div className="w-10 h-10 rounded-full bg-mundial-yellow" />
                 </button>
               </div>
+              {/* Switch camera — only when multiple devices available */}
+              {cameras.length > 1 && (
+                <button
+                  onClick={switchCamera}
+                  className="absolute bottom-6 right-4 p-2.5 rounded-full bg-black/50 text-white/80 hover:text-white hover:bg-black/70 transition-colors"
+                  title="Cambiar cámara"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                </button>
+              )}
               <button
                 onClick={closeCamera}
                 className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-black/50 text-white/80 hover:text-white text-xs font-display uppercase tracking-wider transition-colors"

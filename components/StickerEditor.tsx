@@ -33,6 +33,9 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
   const [processedUrl, setProcessedUrl] = useState<string | null>(null)
   const [processedBlob, setProcessedBlob] = useState<Blob | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [showCamera, setShowCamera] = useState(false)
+  const [hasCameraSupport, setHasCameraSupport] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
   const [progressPct, setProgressPct] = useState(0)
   const [progressLabel, setProgressLabel] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -50,14 +53,27 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
   const [clubName, setClubName] = useState<string>('')
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
   const origUrlRef = useRef<string | null>(null)
   const procUrlRef = useRef<string | null>(null)
   const transformRef = useRef<Transform | null>(null)
 
   useEffect(() => {
+    setHasCameraSupport(!!(navigator.mediaDevices?.getUserMedia))
+  }, [])
+
+  useEffect(() => {
+    if (showCamera && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current
+    }
+  }, [showCamera])
+
+  useEffect(() => {
     return () => {
       if (origUrlRef.current) URL.revokeObjectURL(origUrlRef.current)
       if (procUrlRef.current) URL.revokeObjectURL(procUrlRef.current)
+      streamRef.current?.getTracks().forEach(t => t.stop())
     }
   }, [])
 
@@ -229,8 +245,42 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
     setError(null); setProgressPct(0); setSelectedTemplate(null); setSelectedUniform(null)
     setWithUniform(true); setTransform(null); setCrop({ x: 0, y: 0, w: 1, h: 1 })
     setUniformTransform(null); setUniformCrop({ x: 0, y: 0, w: 1, h: 1 })
-    setPlayerName(''); setClubName('')
+    setPlayerName(''); setClubName(''); setCameraError(null)
   }, [])
+
+  const openCamera = useCallback(async () => {
+    setCameraError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      })
+      streamRef.current = stream
+      setShowCamera(true)
+    } catch {
+      setCameraError('No se pudo acceder a la cámara. Verificá los permisos del navegador.')
+    }
+  }, [])
+
+  const closeCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    streamRef.current = null
+    setShowCamera(false)
+    setCameraError(null)
+  }, [])
+
+  const capturePhoto = useCallback(() => {
+    const video = videoRef.current
+    if (!video) return
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth || 1280
+    canvas.height = video.videoHeight || 720
+    canvas.getContext('2d')!.drawImage(video, 0, 0)
+    canvas.toBlob((blob) => {
+      if (!blob) return
+      closeCamera()
+      processFile(new File([blob], 'foto.jpg', { type: 'image/jpeg' }))
+    }, 'image/jpeg', 0.95)
+  }, [closeCamera, processFile])
 
   const isProcessing = stage === 'loading' || stage === 'processing'
 
@@ -274,33 +324,102 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
         </div>
       )}
 
-      {/* Drop zone */}
+      {/* Drop zone / Camera */}
       {(stage === 'idle' || stage === 'error') && (
-        <div
-          onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
-          className={[
-            'border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-200 select-none outline-none',
-            isDragging
-              ? 'border-mundial-green bg-mundial-green/10 scale-[1.01]'
-              : 'border-mundial-purple/20 bg-white/50 hover:border-mundial-green hover:bg-mundial-green/5',
-          ].join(' ')}
-        >
-          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileChange} />
-          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-mundial-yellow to-mundial-yellow-dark flex items-center justify-center shadow">
-            <svg className="w-7 h-7 text-mundial-purple" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
-            </svg>
-          </div>
-          <p className="font-display text-xl tracking-wide uppercase text-mundial-purple">Subí tu foto</p>
-          <p className="text-sm text-mundial-purple/60 mt-1">Arrastrá o hacé click · JPG / PNG / WEBP · Máx 10 MB</p>
-        </div>
+        <>
+          {/* Camera live view */}
+          {showCamera && (
+            <div className="relative rounded-2xl overflow-hidden bg-black">
+              <video ref={videoRef} autoPlay playsInline muted className="w-full rounded-2xl" />
+              <div className="absolute bottom-0 inset-x-0 p-5 bg-gradient-to-t from-black/70 to-transparent flex items-center justify-center">
+                <button
+                  onClick={capturePhoto}
+                  className="w-16 h-16 rounded-full bg-white border-4 border-mundial-yellow shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center justify-center"
+                  title="Capturar foto"
+                >
+                  <div className="w-10 h-10 rounded-full bg-mundial-yellow" />
+                </button>
+              </div>
+              <button
+                onClick={closeCamera}
+                className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-black/50 text-white/80 hover:text-white text-xs font-display uppercase tracking-wider transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+
+          {/* File picker + camera cards */}
+          {!showCamera && (
+            <div className={hasCameraSupport ? 'grid grid-cols-2 gap-3' : ''}>
+              {/* Gallery card */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+                className={[
+                  'border-2 border-dashed rounded-2xl text-center cursor-pointer transition-all duration-200 select-none outline-none flex flex-col items-center justify-center gap-2',
+                  hasCameraSupport ? 'p-6' : 'p-8',
+                  isDragging
+                    ? 'border-mundial-green bg-mundial-green/10 scale-[1.01]'
+                    : 'border-mundial-purple/20 bg-white/50 hover:border-mundial-green hover:bg-mundial-green/5',
+                ].join(' ')}
+              >
+                <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleFileChange} />
+                <div className={`rounded-2xl bg-gradient-to-br from-mundial-yellow to-mundial-yellow-dark flex items-center justify-center shadow ${hasCameraSupport ? 'w-12 h-12' : 'w-14 h-14 mb-2'}`}>
+                  <svg className={hasCameraSupport ? 'w-6 h-6 text-mundial-purple' : 'w-7 h-7 text-mundial-purple'} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                </div>
+                {hasCameraSupport ? (
+                  <>
+                    <p className="font-display text-sm tracking-wide uppercase text-mundial-purple">Subí tu foto</p>
+                    <p className="text-[11px] text-mundial-purple/50">JPG / PNG / WEBP</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-display text-xl tracking-wide uppercase text-mundial-purple">Subí tu foto</p>
+                    <p className="text-sm text-mundial-purple/60 mt-1">Arrastrá o hacé click · JPG / PNG / WEBP · Máx 10 MB</p>
+                  </>
+                )}
+              </div>
+
+              {/* Camera card */}
+              {hasCameraSupport && (
+                <div
+                  onClick={openCamera}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && openCamera()}
+                  className="border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-200 select-none outline-none flex flex-col items-center justify-center gap-2 border-mundial-purple/20 bg-white/50 hover:border-mundial-turquoise hover:bg-mundial-turquoise/5"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-mundial-turquoise to-mundial-green flex items-center justify-center shadow">
+                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
+                    </svg>
+                  </div>
+                  <p className="font-display text-sm tracking-wide uppercase text-mundial-purple">Tomar foto</p>
+                  <p className="text-[11px] text-mundial-purple/50">Cámara del dispositivo</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Camera permission error */}
+          {cameraError && (
+            <div className="flex items-start gap-2 text-sm text-mundial-red bg-mundial-red/10 border border-mundial-red/30 rounded-xl px-4 py-3">
+              <svg className="w-4 h-4 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+              </svg>
+              {cameraError}
+            </div>
+          )}
+        </>
       )}
 
       {/* Error */}

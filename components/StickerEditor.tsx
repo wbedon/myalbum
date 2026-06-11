@@ -251,9 +251,7 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
   const openCamera = useCallback(async () => {
     setCameraError(null)
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-      })
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true })
       streamRef.current = stream
       setShowCamera(true)
     } catch {
@@ -271,10 +269,16 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
   const capturePhoto = useCallback(() => {
     const video = videoRef.current
     if (!video) return
+    const w = video.videoWidth || 1280
+    const h = video.videoHeight || 720
     const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth || 1280
-    canvas.height = video.videoHeight || 720
-    canvas.getContext('2d')!.drawImage(video, 0, 0)
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext('2d')!
+    // Mirror horizontally to match the preview (scaleX(-1) on <video>)
+    ctx.translate(w, 0)
+    ctx.scale(-1, 1)
+    ctx.drawImage(video, 0, 0)
     canvas.toBlob((blob) => {
       if (!blob) return
       closeCamera()
@@ -330,7 +334,7 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
           {/* Camera live view */}
           {showCamera && (
             <div className="relative rounded-2xl overflow-hidden bg-black">
-              <video ref={videoRef} autoPlay playsInline muted className="w-full rounded-2xl" />
+              <video ref={videoRef} autoPlay playsInline muted className="w-full rounded-2xl" style={{ transform: 'scaleX(-1)' }} />
               <div className="absolute bottom-0 inset-x-0 p-5 bg-gradient-to-t from-black/70 to-transparent flex items-center justify-center">
                 <button
                   onClick={capturePhoto}

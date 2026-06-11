@@ -230,7 +230,8 @@ export default function StickerEditor({ albumId, slot, currentUserId, existingSt
         resultSticker = data as Sticker
       }
 
-      onSave(resultSticker)
+      // Append cache-buster so the browser fetches the new image (same URL, new content)
+      onSave({ ...resultSticker, image_url: `${resultSticker.image_url}?t=${Date.now()}` })
     } catch (err) {
       const msg = err instanceof Error ? err.message
         : typeof err === 'object' && err !== null && 'message' in err ? String((err as { message: unknown }).message)

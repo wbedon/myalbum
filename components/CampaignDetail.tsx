@@ -672,7 +672,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                 <p className="text-sm text-mundial-purple/60">{albumDisplay.description}</p>
               )}
               <span className="text-xs text-mundial-purple/40 font-condensed">
-                · {albumDisplay.pack_size} cromos por sobre
+                · {albumDisplay.pack_size} stickers por sobre
               </span>
             </div>
           </div>

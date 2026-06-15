@@ -441,6 +441,10 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [isReviewing, setIsReviewing] = useState(false)
+  const [selectedStickerIds, setSelectedStickerIds] = useState<Set<string>>(new Set())
+  const [bulkRejectOpen, setBulkRejectOpen] = useState(false)
+  const [bulkRejectReason, setBulkRejectReason] = useState('')
+  const [isBulkReviewing, setIsBulkReviewing] = useState(false)
 
   const fetchInvitations = useCallback(async () => {
     setInvLoading(true)
@@ -520,10 +524,57 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
       .eq('id', stickerId)
     if (!error) {
       setPendingStickers((prev) => prev.filter((s) => s.id !== stickerId))
+      setSelectedStickerIds((prev) => { const next = new Set(prev); next.delete(stickerId); return next })
       setRejectingId(null)
       setRejectReason('')
     }
     setIsReviewing(false)
+  }
+
+  const handleToggleSelect = (id: string) => {
+    setSelectedStickerIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleSelectAll = () => {
+    if (selectedStickerIds.size === pendingStickers.length) {
+      setSelectedStickerIds(new Set())
+    } else {
+      setSelectedStickerIds(new Set(pendingStickers.map((s) => s.id)))
+    }
+  }
+
+  const handleBulkApprove = async () => {
+    if (selectedStickerIds.size === 0) return
+    setIsBulkReviewing(true)
+    const ids = Array.from(selectedStickerIds)
+    const { error } = await supabase.from('stickers').update({ status: 'approved' }).in('id', ids)
+    if (!error) {
+      setPendingStickers((prev) => prev.filter((s) => !selectedStickerIds.has(s.id)))
+      setSelectedStickerIds(new Set())
+    }
+    setIsBulkReviewing(false)
+  }
+
+  const handleBulkReject = async () => {
+    if (selectedStickerIds.size === 0 || !bulkRejectReason.trim()) return
+    setIsBulkReviewing(true)
+    const ids = Array.from(selectedStickerIds)
+    const { error } = await supabase
+      .from('stickers')
+      .update({ status: 'rejected', rejection_reason: bulkRejectReason.trim() })
+      .in('id', ids)
+    if (!error) {
+      setPendingStickers((prev) => prev.filter((s) => !selectedStickerIds.has(s.id)))
+      setSelectedStickerIds(new Set())
+      setBulkRejectOpen(false)
+      setBulkRejectReason('')
+    }
+    setIsBulkReviewing(false)
   }
 
   const handleStickerSaved = useCallback((sticker: Sticker) => {
@@ -1359,7 +1410,44 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
             <span className="font-condensed text-sm font-bold text-mundial-purple">
               {pendingStickers.length} sticker{pendingStickers.length !== 1 ? 's' : ''} esperando revisión
             </span>
+            {pendingStickers.length > 1 && pendingFetched && (
+              <button
+                onClick={handleSelectAll}
+                className="ml-auto text-xs font-condensed font-bold tracking-wider uppercase text-mundial-purple/50 hover:text-mundial-purple transition-colors"
+              >
+                {selectedStickerIds.size === pendingStickers.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
+              </button>
+            )}
           </div>
+
+          {/* Bulk action bar */}
+          {selectedStickerIds.size > 0 && (
+            <div className="flex items-center gap-3 px-4 py-3 bg-mundial-gold/10 border border-mundial-gold/30 rounded-2xl">
+              <span className="font-condensed text-sm font-bold text-mundial-purple/70 flex-1">
+                {selectedStickerIds.size} seleccionado{selectedStickerIds.size !== 1 ? 's' : ''}
+              </span>
+              <button
+                onClick={handleBulkApprove}
+                disabled={isBulkReviewing}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-mundial-green hover:bg-mundial-green/90 disabled:opacity-60 text-white font-display text-xs tracking-wider uppercase rounded-xl transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                {isBulkReviewing ? '…' : `Aprobar ${selectedStickerIds.size}`}
+              </button>
+              <button
+                onClick={() => { setBulkRejectOpen(true); setBulkRejectReason('') }}
+                disabled={isBulkReviewing}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-mundial-cream hover:bg-mundial-red/10 disabled:opacity-60 text-mundial-red border-2 border-mundial-red/25 hover:border-mundial-red/50 font-display text-xs tracking-wider uppercase rounded-xl transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Rechazar {selectedStickerIds.size}
+              </button>
+            </div>
+          )}
 
           {!pendingFetched ? (
             <div className="grid gap-4">
@@ -1372,14 +1460,28 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <p className="font-display text-base tracking-wider uppercase text-mundial-purple/50">Sin cromos pendientes</p>
+              <p className="font-display text-base tracking-wider uppercase text-mundial-purple/50">Sin stickers pendientes</p>
               <p className="text-sm text-mundial-purple/35">Todos los envíos fueron revisados.</p>
             </div>
           ) : (
             <div className="grid gap-4">
               {pendingStickers.map((s) => (
-                <div key={s.id} className="glass-card rounded-2xl p-4 space-y-3">
-                  <div className="flex items-start gap-4">
+                <div
+                  key={s.id}
+                  className={`glass-card rounded-2xl p-4 space-y-3 transition-colors ${selectedStickerIds.has(s.id) ? 'ring-2 ring-mundial-gold/60 bg-mundial-gold/5' : ''}`}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* Checkbox */}
+                    <button
+                      onClick={() => handleToggleSelect(s.id)}
+                      className={`mt-1 shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${selectedStickerIds.has(s.id) ? 'bg-mundial-gold border-mundial-gold' : 'border-mundial-purple/25 hover:border-mundial-purple/50'}`}
+                    >
+                      {selectedStickerIds.has(s.id) && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      )}
+                    </button>
                     <img src={s.image_url} alt="" className="w-16 h-20 object-contain rounded-xl border border-mundial-purple/10 bg-mundial-cream shrink-0" />
                     <div className="flex-1 min-w-0 space-y-1">
                       <p className="font-display text-sm tracking-wide uppercase text-mundial-purple">
@@ -1487,6 +1589,61 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
           currentUserId={currentUserId}
           onClose={() => setProfileUserId(null)}
         />
+      )}
+
+      {/* ── Modal: Rechazar en lote ─────────────────────────────────── */}
+      {bulkRejectOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-mundial-navy-deep/60 animate-fade-in"
+          onClick={(e) => { if (e.target === e.currentTarget) { setBulkRejectOpen(false); setBulkRejectReason('') } }}
+        >
+          <div className="w-full max-w-sm glass-card rounded-3xl shadow-2xl">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-mundial-purple/10">
+              <h3 className="font-display text-base tracking-wide uppercase text-mundial-red">
+                Rechazar {selectedStickerIds.size} sticker{selectedStickerIds.size !== 1 ? 's' : ''}
+              </h3>
+              <button
+                onClick={() => { setBulkRejectOpen(false); setBulkRejectReason('') }}
+                className="w-8 h-8 rounded-lg hover:bg-mundial-purple/8 text-mundial-purple/40 hover:text-mundial-purple transition-colors flex items-center justify-center"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="font-condensed text-[10px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
+                  Motivo del rechazo *
+                </label>
+                <input
+                  type="text"
+                  value={bulkRejectReason}
+                  onChange={(e) => setBulkRejectReason(e.target.value)}
+                  placeholder="Ej: Imagen de baja calidad"
+                  autoFocus
+                  className="w-full px-4 py-3 rounded-xl border-2 border-mundial-red/30 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-red/60 transition-colors text-sm"
+                />
+                <p className="text-[11px] text-mundial-purple/40">Este motivo se enviará a todos los seleccionados.</p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => { setBulkRejectOpen(false); setBulkRejectReason('') }}
+                  className="flex-1 py-3 rounded-xl border-2 border-mundial-purple/15 text-mundial-purple/60 font-display text-xs tracking-wider uppercase hover:border-mundial-purple/30 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleBulkReject}
+                  disabled={!bulkRejectReason.trim() || isBulkReviewing}
+                  className="flex-1 py-3 rounded-xl bg-mundial-red hover:bg-mundial-red/90 disabled:opacity-40 text-white font-display text-xs tracking-wider uppercase transition-colors"
+                >
+                  {isBulkReviewing ? '…' : 'Confirmar rechazo'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Modal: Editar álbum ──────────────────────────────────────── */}

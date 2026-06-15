@@ -33,6 +33,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
   const [reactions, setReactions]         = useState<ReactMap>(new Map())
   const [profileUserId, setProfileUserId] = useState<string | null>(null)
   const [toggling, setToggling]           = useState<string | null>(null) // sticker_id+emoji key
+  const [sharing, setSharing]             = useState<string | null>(null) // sticker id being shared
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
@@ -137,6 +138,47 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
     }
 
     setToggling(null)
+  }
+
+  const handleShare = async (stickerId: string, imageUrl: string, username: string) => {
+    setSharing(stickerId)
+    try {
+      const response = await fetch(imageUrl)
+      const blob = await response.blob()
+      const file = new File([blob], `sticker-${username}.png`, { type: 'image/png' })
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: `Sticker de ${username} · ${album.name}` })
+      } else if (navigator.share) {
+        await navigator.share({ url: imageUrl, title: `Sticker de ${username} · ${album.name}` })
+      } else {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `sticker-${username}.png`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') {
+        // share failed — fall back to download
+        try {
+          const r = await fetch(imageUrl)
+          const b = await r.blob()
+          const url = URL.createObjectURL(b)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `sticker-${username}.png`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          setTimeout(() => URL.revokeObjectURL(url), 1000)
+        } catch {}
+      }
+    } finally {
+      setSharing(null)
+    }
   }
 
   // ── Derived ──────────────────────────────────────────────────────
@@ -251,7 +293,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                             <div key={s.id} className="flex flex-col items-center gap-1.5 group">
                               {/* Sticker image */}
                               <div className={[
-                                'w-20 h-[100px] rounded-xl overflow-hidden border-2 transition-all duration-200 group-hover:scale-105 cursor-pointer',
+                                'relative w-20 h-[100px] rounded-xl overflow-hidden border-2 transition-all duration-200 group-hover:scale-105 cursor-pointer',
                                 isMe
                                   ? 'border-mundial-yellow shadow-md'
                                   : 'border-mundial-purple/10',
@@ -263,6 +305,21 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                                   alt={`${s.username} · slot ${slot.slot_number}`}
                                   className="w-full h-full object-contain bg-mundial-cream"
                                 />
+                                {/* Share / download button */}
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleShare(s.id, s.image_url, s.username) }}
+                                  disabled={sharing === s.id}
+                                  aria-label="Compartir sticker"
+                                  className="absolute bottom-1 right-1 w-6 h-6 rounded-lg bg-black/50 hover:bg-black/70 disabled:opacity-50 text-white flex items-center justify-center transition-colors"
+                                >
+                                  {sharing === s.id ? (
+                                    <span className="text-[8px] font-bold leading-none">…</span>
+                                  ) : (
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                    </svg>
+                                  )}
+                                </button>
                               </div>
 
                               {/* Creator name */}

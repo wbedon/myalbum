@@ -92,7 +92,45 @@ export default function NotificationsPanel({ albumId, refreshKey, onTabBadge }: 
   useEffect(() => {
     fetchNotifs()
     const interval = setInterval(fetchNotifs, 30000)
-    return () => clearInterval(interval)
+
+    // Realtime: INSERT en notifications para este álbum
+    let channel: ReturnType<typeof supabase.channel> | null = null
+    supabase.auth.getUser().then(({ data }) => {
+      const userId = data.user?.id
+      if (!userId) return
+      channel = supabase
+        .channel(`notifs:${albumId}:${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            const n = payload.new as Notification
+            if (n.album_id !== albumId) return
+            setNotifs((prev) => [n, ...prev])
+            if (onTabBadge) {
+              setNotifs((prev) => {
+                const counts: TabBadgeCounts = { stickers: 0, album: 0, trades: 0 }
+                for (const notif of prev) {
+                  if (!notif.read) counts[tabFor(notif.type)]++
+                }
+                onTabBadge(counts)
+                return prev
+              })
+            }
+          }
+        )
+        .subscribe()
+    })
+
+    return () => {
+      clearInterval(interval)
+      if (channel) supabase.removeChannel(channel)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [albumId])
 

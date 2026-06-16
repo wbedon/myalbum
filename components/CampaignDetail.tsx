@@ -166,6 +166,8 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   // ── Perfil de usuario ─────────────────────────────────────────────
   const [profileUserId, setProfileUserId] = useState<string | null>(null)
 
+  const [memberSearch, setMemberSearch] = useState('')
+
   // ── Participantes ─────────────────────────────────────────────────
   const [members, setMembers] = useState<AlbumMember[]>([])
   const [membersLoading, setMembersLoading] = useState(true)
@@ -695,8 +697,9 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
       .then(() => setNotifRefreshKey((k) => k + 1))
   }, [tab, album.id])
 
-  const admins = members.filter((m) => m.role === 'admin')
-  const regulars = members.filter((m) => m.role === 'member')
+  const memberSearchLower = memberSearch.trim().toLowerCase()
+  const admins   = members.filter((m) => m.role === 'admin'  && (!memberSearchLower || (m.username ?? '').toLowerCase().includes(memberSearchLower)))
+  const regulars = members.filter((m) => m.role === 'member' && (!memberSearchLower || (m.username ?? '').toLowerCase().includes(memberSearchLower)))
 
   return (
     <div className="space-y-6">
@@ -863,6 +866,29 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
       {/* ── Tab: Participantes ──────────────────────────────────────── */}
       {tab === 'participants' && (
         <div className="space-y-5">
+          {/* Buscador */}
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-mundial-purple/30 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z" />
+            </svg>
+            <input
+              type="text"
+              value={memberSearch}
+              onChange={(e) => setMemberSearch(e.target.value)}
+              placeholder="Buscar participante…"
+              className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border-2 border-mundial-purple/15 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-purple/40 transition-colors"
+            />
+            {memberSearch && (
+              <button
+                onClick={() => setMemberSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-mundial-purple/30 hover:text-mundial-purple transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
           {membersLoading ? (
             <div className="space-y-3">
               {[1, 2].map((i) => <div key={i} className="h-16 rounded-2xl bg-mundial-cream animate-pulse" />)}

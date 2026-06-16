@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import JSZip from 'jszip'
 import { supabase, type Album, type AlbumSlot, type AlbumMember } from '@/lib/supabase'
 import Avatar from './Avatar'
 import UserProfileModal from './UserProfileModal'
@@ -44,6 +45,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
   const [sharing, setSharing]             = useState<string | null>(null)
   const [filterUserId, setFilterUserId]   = useState<string | null>(null)
   const [filterSlot, setFilterSlot]       = useState<'all' | 'with' | 'without'>('all')
+  const [exporting, setExporting]         = useState(false)
   const [commentSticker, setCommentSticker]       = useState<ApprovedSticker | null>(null)
   const [comments, setComments]                   = useState<CommentWithUser[]>([])
   const [commentCounts, setCommentCounts]         = useState<Map<string, number>>(new Map())
@@ -263,6 +265,38 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
     })
   }
 
+  const handleExport = async () => {
+    if (exporting || stickers.length === 0) return
+    setExporting(true)
+    try {
+      const zip = new JSZip()
+      const folder = zip.folder(album.name) ?? zip
+      await Promise.all(
+        stickers.map(async (s) => {
+          try {
+            const res = await fetch(s.image_url)
+            const blob = await res.blob()
+            const ext = blob.type.includes('png') ? 'png' : 'jpg'
+            folder.file(`${s.username}-slot.${ext}`, blob)
+          } catch {
+            // skip failed images
+          }
+        })
+      )
+      const content = await zip.generateAsync({ type: 'blob' })
+      const url = URL.createObjectURL(content)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${album.name.replace(/\s+/g, '_')}_stickers.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   // ── Derived ──────────────────────────────────────────────────────
   const bySlot = new Map<string, ApprovedSticker[]>()
   stickers.forEach((s) => {
@@ -333,6 +367,28 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
           <div className="flex items-center gap-2.5 px-4 py-3 bg-mundial-purple/8 border border-mundial-purple/20 rounded-2xl">
             <span className="font-display text-sm text-mundial-purple">Tu posición: #{myRank}</span>
           </div>
+        )}
+
+        {stickers.length > 0 && (
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="ml-auto flex items-center gap-2 px-4 py-3 bg-mundial-purple/8 border border-mundial-purple/20 rounded-2xl hover:bg-mundial-purple/15 disabled:opacity-50 transition-all"
+          >
+            {exporting ? (
+              <svg className="w-4 h-4 text-mundial-purple animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 text-mundial-purple" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+              </svg>
+            )}
+            <span className="font-condensed text-sm font-bold text-mundial-purple">
+              {exporting ? 'Exportando…' : 'Exportar ZIP'}
+            </span>
+          </button>
         )}
       </div>
 

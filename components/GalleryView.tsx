@@ -473,7 +473,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                 key={opt}
                 onClick={() => setFilterSlot(opt)}
                 className={[
-                  'px-3 py-1.5 rounded-full font-condensed text-[10px] font-bold tracking-wider uppercase transition-all',
+                  'px-3 py-2 rounded-full font-condensed text-[10px] font-bold tracking-wider uppercase transition-all',
                   filterSlot === opt
                     ? 'bg-mundial-purple text-white'
                     : 'bg-mundial-purple/8 text-mundial-purple/50 hover:bg-mundial-purple/15',
@@ -645,7 +645,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                                       disabled={isActive}
                                       title={emoji}
                                       className={[
-                                        'flex items-center gap-0.5 px-1.5 py-1 rounded-full text-[10px] transition-all leading-none',
+                                        'flex items-center gap-0.5 px-1.5 py-1 min-h-[26px] rounded-full text-[10px] transition-all leading-none',
                                         reacted
                                           ? 'bg-mundial-yellow/30 text-mundial-purple scale-110'
                                           : 'hover:bg-mundial-purple/8 text-mundial-purple/40 hover:text-mundial-purple',

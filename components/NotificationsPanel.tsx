@@ -32,7 +32,8 @@ function notifIcon(type: NotificationType): string {
     case 'sticker_rejected': return '❌'
     case 'trade_requested':  return '🔄'
     case 'trade_accepted':   return '🤝'
-    case 'pack_available':   return '🎁'
+    case 'pack_available':    return '🎁'
+    case 'sticker_commented': return '💬'
   }
 }
 
@@ -51,11 +52,15 @@ function notifMessage(n: Notification): string {
       return `${p.offerer_username} aceptó tu solicitud. Recibiste slot #${p.got_slot_number}${p.got_slot_label ? ` (${p.got_slot_label})` : ''}.`
     case 'pack_available':
       return `¡Tienes un sobre disponible con ${p.pack_size} stickers! Ábrelo en Mi Álbum.`
+    case 'sticker_commented': {
+      const preview = p.content_preview ? ` "${p.content_preview}"` : ''
+      return `Alguien comentó en tu sticker:${preview}`
+    }
   }
 }
 
 function tabFor(type: NotificationType): keyof TabBadgeCounts {
-  if (type === 'sticker_approved' || type === 'sticker_rejected') return 'stickers'
+  if (type === 'sticker_approved' || type === 'sticker_rejected' || type === 'sticker_commented') return 'stickers'
   if (type === 'pack_available') return 'album'
   return 'trades'
 }

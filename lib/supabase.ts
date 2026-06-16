@@ -212,6 +212,7 @@ export type NotificationType =
   | 'trade_requested'
   | 'trade_accepted'
   | 'pack_available'
+  | 'sticker_commented'
 
 export type Notification = {
   id: string

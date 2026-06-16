@@ -42,6 +42,8 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
   const [profileUserId, setProfileUserId] = useState<string | null>(null)
   const [toggling, setToggling]           = useState<string | null>(null)
   const [sharing, setSharing]             = useState<string | null>(null)
+  const [filterUserId, setFilterUserId]   = useState<string | null>(null)
+  const [filterSlot, setFilterSlot]       = useState<'all' | 'with' | 'without'>('all')
   const [commentSticker, setCommentSticker]       = useState<ApprovedSticker | null>(null)
   const [comments, setComments]                   = useState<CommentWithUser[]>([])
   const [commentCounts, setCommentCounts]         = useState<Map<string, number>>(new Map())
@@ -271,6 +273,17 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
   const coveredSlots  = slots.filter((sl) => bySlot.has(sl.id)).length
   const totalApproved = stickers.length
 
+  const visibleSlots = slots.filter((sl) => {
+    const items = bySlot.get(sl.id) ?? []
+    if (filterSlot === 'with' && items.length === 0) return false
+    if (filterSlot === 'without' && items.length > 0) return false
+    if (filterUserId) {
+      const filtered = items.filter((s) => s.user_id === filterUserId)
+      return filtered.length > 0 || filterSlot !== 'with'
+    }
+    return true
+  })
+
   const leaderboard = [...members]
     .map((m) => ({ ...m, completed: userSlots.get(m.user_id)?.size ?? 0 }))
     .sort((a, b) => b.completed - a.completed || (a.username ?? '').localeCompare(b.username ?? ''))
@@ -325,16 +338,63 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
 
       {/* ── Galería por slot ──────────────────────────────────────── */}
       <section className="space-y-4">
-        <h3 className="font-condensed text-[11px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
-          Galería
-        </h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="font-condensed text-[11px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50 mr-1">
+            Galería
+          </h3>
+
+          {/* Slot status filter */}
+          {(['all', 'with', 'without'] as const).map((opt) => {
+            const label = opt === 'all' ? 'Todos' : opt === 'with' ? 'Con sticker' : 'Sin sticker'
+            return (
+              <button
+                key={opt}
+                onClick={() => setFilterSlot(opt)}
+                className={[
+                  'px-3 py-1 rounded-full font-condensed text-[10px] font-bold tracking-wider uppercase transition-all',
+                  filterSlot === opt
+                    ? 'bg-mundial-purple text-white'
+                    : 'bg-mundial-purple/8 text-mundial-purple/50 hover:bg-mundial-purple/15',
+                ].join(' ')}
+              >
+                {label}
+              </button>
+            )
+          })}
+
+          {/* User filter */}
+          {stickers.length > 0 && (
+            <select
+              value={filterUserId ?? ''}
+              onChange={(e) => setFilterUserId(e.target.value || null)}
+              className="px-3 py-1 rounded-full font-condensed text-[10px] font-bold tracking-wider uppercase bg-mundial-purple/8 text-mundial-purple/50 border-0 focus:outline-none focus:bg-mundial-purple/15 transition-all cursor-pointer appearance-none pr-6"
+            >
+              <option value="">Todos los usuarios</option>
+              {Array.from(new Map(stickers.map((s) => [s.user_id, s.username]))).map(([uid, uname]) => (
+                <option key={uid} value={uid}>{uname}</option>
+              ))}
+            </select>
+          )}
+
+          {(filterSlot !== 'all' || filterUserId) && (
+            <button
+              onClick={() => { setFilterSlot('all'); setFilterUserId(null) }}
+              className="px-2 py-1 rounded-full font-condensed text-[10px] font-bold tracking-wider uppercase text-mundial-red/60 hover:text-mundial-red hover:bg-mundial-red/8 transition-all"
+            >
+              × Limpiar
+            </button>
+          )}
+        </div>
 
         {slots.length === 0 ? (
           <p className="text-sm text-mundial-purple/40 italic">Sin slots definidos en esta campaña.</p>
+        ) : visibleSlots.length === 0 ? (
+          <p className="text-sm text-mundial-purple/40 italic py-4 text-center">Sin resultados para los filtros aplicados.</p>
         ) : (
           <div className="space-y-4">
-            {slots.map((slot) => {
-              const items = bySlot.get(slot.id) ?? []
+            {visibleSlots.map((slot) => {
+              const allItems = bySlot.get(slot.id) ?? []
+              const items = filterUserId ? allItems.filter((s) => s.user_id === filterUserId) : allItems
               return (
                 <div key={slot.id} className={[
                   'rounded-2xl overflow-hidden border',

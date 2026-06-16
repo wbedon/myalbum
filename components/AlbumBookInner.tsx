@@ -234,18 +234,28 @@ export default function AlbumBookInner({
   const scrollRef = useRef(0)
   const [currentPage, setCurrentPage] = useState(0)
 
-  // Preserve scroll position — react-pageflip DOM mutations reset scroll on mobile
+  // Preserve scroll — react-pageflip mutates the DOM across several frames,
+  // which resets scroll on iOS. Double-rAF waits for the full paint cycle.
+  const restoreScroll = useCallback(() => {
+    const y = scrollRef.current
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: y, behavior: 'instant' as ScrollBehavior })
+      })
+    })
+  }, [])
+
   const goNext = useCallback(() => {
     scrollRef.current = window.scrollY
     bookRef.current?.pageFlip().flipNext()
-    requestAnimationFrame(() => window.scrollTo({ top: scrollRef.current, behavior: 'instant' as ScrollBehavior }))
-  }, [])
+    restoreScroll()
+  }, [restoreScroll])
 
   const goPrev = useCallback(() => {
     scrollRef.current = window.scrollY
     bookRef.current?.pageFlip().flipPrev()
-    requestAnimationFrame(() => window.scrollTo({ top: scrollRef.current, behavior: 'instant' as ScrollBehavior }))
-  }, [])
+    restoreScroll()
+  }, [restoreScroll])
 
   // Build pages array imperatively — react-pageflip uses React.Children.map + cloneElement
   // internally, which throws if any child is null/false/undefined. Never use && or ternaries
@@ -279,8 +289,8 @@ export default function AlbumBookInner({
         </span>
       </div>
 
-      {/* Book stage */}
-      <div className="relative rounded-2xl bg-gradient-to-br from-stone-800 via-stone-700 to-stone-900 p-4 sm:p-6 shadow-2xl">
+      {/* Book stage — overflow-anchor:none prevents browser scroll-anchor reflow */}
+      <div className="relative rounded-2xl bg-gradient-to-br from-stone-800 via-stone-700 to-stone-900 p-4 sm:p-6 shadow-2xl" style={{ overflowAnchor: 'none' }}>
         {/* Subtle grain texture */}
         <div
           className="absolute inset-0 rounded-2xl opacity-[0.035] pointer-events-none"
@@ -330,6 +340,7 @@ export default function AlbumBookInner({
           <button
             type="button"
             onClick={goPrev}
+            onMouseDown={e => e.preventDefault()}
             disabled={currentPage === 0}
             className="rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-25 disabled:cursor-default px-5 py-2 text-sm font-condensed font-bold tracking-wider text-stone-100 transition-colors"
           >
@@ -341,6 +352,7 @@ export default function AlbumBookInner({
           <button
             type="button"
             onClick={goNext}
+            onMouseDown={e => e.preventDefault()}
             disabled={currentPage >= totalPages - 1}
             className="rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-25 disabled:cursor-default px-5 py-2 text-sm font-condensed font-bold tracking-wider text-stone-100 transition-colors"
           >

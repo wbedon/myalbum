@@ -45,6 +45,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
   const [sharing, setSharing]             = useState<string | null>(null)
   const [filterUserId, setFilterUserId]   = useState<string | null>(null)
   const [filterSlot, setFilterSlot]       = useState<'all' | 'with' | 'without'>('all')
+  const [sortBy, setSortBy]               = useState<'slot' | 'reactions' | 'comments'>('slot')
   const [exporting, setExporting]         = useState(false)
   const [commentSticker, setCommentSticker]       = useState<ApprovedSticker | null>(null)
   const [comments, setComments]                   = useState<CommentWithUser[]>([])
@@ -320,6 +321,23 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
     return true
   })
 
+  const slotScore = (slotId: string): number => {
+    const items = bySlot.get(slotId) ?? []
+    if (sortBy === 'reactions') {
+      return items.reduce((acc, s) => {
+        let r = 0; reactions.get(s.id)?.forEach((set) => { r += set.size }); return acc + r
+      }, 0)
+    }
+    if (sortBy === 'comments') {
+      return items.reduce((acc, s) => acc + (commentCounts.get(s.id) ?? 0), 0)
+    }
+    return 0
+  }
+
+  const sortedVisibleSlots = sortBy === 'slot'
+    ? visibleSlots
+    : [...visibleSlots].sort((a, b) => slotScore(b.id) - slotScore(a.id))
+
   const leaderboard = [...members]
     .map((m) => ({ ...m, completed: userSlots.get(m.user_id)?.size ?? 0 }))
     .sort((a, b) => b.completed - a.completed || (a.username ?? '').localeCompare(b.username ?? ''))
@@ -466,6 +484,29 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
               × Limpiar
             </button>
           )}
+
+          {/* Ordenar */}
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="font-condensed text-[9px] font-bold tracking-[0.2em] uppercase text-mundial-purple/30 mr-0.5">Ordenar:</span>
+            {([
+              { key: 'slot',      label: '# Slot'     },
+              { key: 'reactions', label: '❤️ Reac.'   },
+              { key: 'comments',  label: '💬 Coment.' },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setSortBy(key)}
+                className={[
+                  'px-2.5 py-1 rounded-full font-condensed text-[10px] font-bold tracking-wider uppercase transition-all',
+                  sortBy === key
+                    ? 'bg-mundial-purple text-white'
+                    : 'bg-mundial-purple/8 text-mundial-purple/50 hover:bg-mundial-purple/15',
+                ].join(' ')}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {slots.length === 0 ? (
@@ -474,7 +515,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
           <p className="text-sm text-mundial-purple/40 italic py-4 text-center">Sin resultados para los filtros aplicados.</p>
         ) : (
           <div className="space-y-4">
-            {visibleSlots.map((slot) => {
+            {sortedVisibleSlots.map((slot) => {
               const allItems = bySlot.get(slot.id) ?? []
               const items = filterUserId ? allItems.filter((s) => s.user_id === filterUserId) : allItems
               return (

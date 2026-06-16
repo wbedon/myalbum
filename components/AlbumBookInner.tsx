@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef, useRef, useState, type ReactNode } from 'react'
+import { forwardRef, useRef, useState, useCallback, type ReactNode } from 'react'
 import HTMLFlipBook from 'react-pageflip'
 import type { AlbumSlot } from '@/lib/supabase'
 
@@ -230,8 +230,22 @@ export default function AlbumBookInner({
   slots, bySlot, portadaUrl, contraportadaUrl, albumName, totalSlots, collectedCount,
 }: Props) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const bookRef = useRef<any>(null)
+  const bookRef   = useRef<any>(null)
+  const scrollRef = useRef(0)
   const [currentPage, setCurrentPage] = useState(0)
+
+  // Preserve scroll position — react-pageflip DOM mutations reset scroll on mobile
+  const goNext = useCallback(() => {
+    scrollRef.current = window.scrollY
+    bookRef.current?.pageFlip().flipNext()
+    requestAnimationFrame(() => window.scrollTo({ top: scrollRef.current, behavior: 'instant' as ScrollBehavior }))
+  }, [])
+
+  const goPrev = useCallback(() => {
+    scrollRef.current = window.scrollY
+    bookRef.current?.pageFlip().flipPrev()
+    requestAnimationFrame(() => window.scrollTo({ top: scrollRef.current, behavior: 'instant' as ScrollBehavior }))
+  }, [])
 
   // Build pages array imperatively — react-pageflip uses React.Children.map + cloneElement
   // internally, which throws if any child is null/false/undefined. Never use && or ternaries
@@ -276,25 +290,25 @@ export default function AlbumBookInner({
           }}
         />
 
-        {/* HTMLFlipBook */}
-        <div className="flex justify-center">
+        {/* HTMLFlipBook — touch-action:none prevents page scroll while dragging pages */}
+        <div className="flex justify-center" style={{ touchAction: 'none' }}>
           {/* @ts-ignore – react-pageflip ref typing is loose */}
           <HTMLFlipBook
             ref={bookRef}
-            width={320}
-            height={460}
+            width={300}
+            height={440}
             size="stretch"
-            minWidth={220}
-            maxWidth={420}
-            minHeight={340}
-            maxHeight={620}
+            minWidth={200}
+            maxWidth={400}
+            minHeight={300}
+            maxHeight={580}
             showCover={true}
-            showPageCorners={true}
+            showPageCorners={false}
             useMouseEvents={true}
-            mobileScrollSupport={true}
-            swipeDistance={25}
-            flippingTime={700}
-            maxShadowOpacity={0.55}
+            mobileScrollSupport={false}
+            swipeDistance={40}
+            flippingTime={400}
+            maxShadowOpacity={0.3}
             drawShadow={true}
             clickEventForward={false}
             disableFlipByClick={false}
@@ -302,7 +316,7 @@ export default function AlbumBookInner({
             autoSize={true}
             startPage={0}
             startZIndex={0}
-            renderOnlyPageLengthChange={false}
+            renderOnlyPageLengthChange={true}
             className=""
             style={{}}
             onFlip={(e: { data: number }) => setCurrentPage(e.data)}
@@ -314,7 +328,8 @@ export default function AlbumBookInner({
         {/* Navigation controls */}
         <div className="mt-5 flex items-center justify-center gap-4">
           <button
-            onClick={() => bookRef.current?.pageFlip().flipPrev()}
+            type="button"
+            onClick={goPrev}
             disabled={currentPage === 0}
             className="rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-25 disabled:cursor-default px-5 py-2 text-sm font-condensed font-bold tracking-wider text-stone-100 transition-colors"
           >
@@ -324,7 +339,8 @@ export default function AlbumBookInner({
             {currentPage + 1} / {totalPages}
           </span>
           <button
-            onClick={() => bookRef.current?.pageFlip().flipNext()}
+            type="button"
+            onClick={goNext}
             disabled={currentPage >= totalPages - 1}
             className="rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-25 disabled:cursor-default px-5 py-2 text-sm font-condensed font-bold tracking-wider text-stone-100 transition-colors"
           >
@@ -332,7 +348,7 @@ export default function AlbumBookInner({
           </button>
         </div>
         <p className="mt-1.5 text-center text-[10px] text-stone-500 font-condensed tracking-wider">
-          Arrastra las esquinas para pasar página
+          Desliza o usa los botones para pasar página
         </p>
       </div>
     </div>

@@ -274,6 +274,9 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
   const [newSlotLabel, setNewSlotLabel] = useState('')
   const [isAddingSlot, setIsAddingSlot] = useState(false)
   const [deletingSlot, setDeletingSlot] = useState<string | null>(null)
+  const [editingSlotId, setEditingSlotId]     = useState<string | null>(null)
+  const [editingSlotLabel, setEditingSlotLabel] = useState('')
+  const [savingSlotLabel, setSavingSlotLabel]   = useState(false)
   const [slotError, setSlotError]     = useState<string | null>(null)
   const [bulkRange, setBulkRange]     = useState('')
   const [isBulking, setIsBulking]     = useState(false)
@@ -382,6 +385,17 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
     await supabase.from('album_slots').delete().eq('id', id)
     setSlots((prev) => prev.filter((s) => s.id !== id))
     setDeletingSlot(null)
+  }
+
+  const handleSaveSlotLabel = async (slotId: string) => {
+    setSavingSlotLabel(true)
+    const label = editingSlotLabel.trim() || null
+    const { error } = await supabase.from('album_slots').update({ label }).eq('id', slotId)
+    if (!error) {
+      setSlots((prev) => prev.map((s) => s.id === slotId ? { ...s, label } : s))
+      setEditingSlotId(null)
+    }
+    setSavingSlotLabel(false)
   }
 
   // ── Asignación de slots ──────────────────────────────────────────
@@ -1127,19 +1141,72 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                   <div className="w-9 h-9 rounded-lg bg-mundial-purple/10 flex items-center justify-center shrink-0">
                     <span className="font-display text-sm text-mundial-purple font-bold">{slot.slot_number}</span>
                   </div>
-                  <span className="flex-1 text-sm text-mundial-purple">
-                    {slot.label ?? <span className="text-mundial-purple/35 italic">Sin etiqueta</span>}
-                  </span>
-                  {isAdminView && (
-                    <button
-                      onClick={() => handleDeleteSlot(slot.id)}
-                      disabled={deletingSlot === slot.id}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-mundial-red/10 text-mundial-red/50 hover:text-mundial-red transition-all disabled:opacity-40"
+
+                  {editingSlotId === slot.id ? (
+                    /* Inline edit mode */
+                    <form
+                      className="flex flex-1 items-center gap-2"
+                      onSubmit={(e) => { e.preventDefault(); handleSaveSlotLabel(slot.id) }}
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+                      <input
+                        autoFocus
+                        type="text"
+                        value={editingSlotLabel}
+                        onChange={(e) => setEditingSlotLabel(e.target.value)}
+                        placeholder="Etiqueta (vacío = sin etiqueta)"
+                        className="flex-1 px-2 py-1 text-sm rounded-lg border-2 border-mundial-green/50 bg-white text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-green transition-colors"
+                      />
+                      <button
+                        type="submit"
+                        disabled={savingSlotLabel}
+                        className="px-3 py-1 bg-mundial-green hover:bg-mundial-green/90 disabled:opacity-60 text-white text-xs font-bold rounded-lg transition-colors"
+                      >
+                        {savingSlotLabel ? '…' : 'Guardar'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingSlotId(null)}
+                        className="p-1.5 rounded-lg hover:bg-mundial-purple/10 text-mundial-purple/50 hover:text-mundial-purple transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </form>
+                  ) : (
+                    /* View mode */
+                    <>
+                      <span className="flex-1 text-sm text-mundial-purple">
+                        {slot.label ?? <span className="text-mundial-purple/35 italic">Sin etiqueta</span>}
+                      </span>
+                      {isAdminView && (
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {/* Edit label */}
+                          <button
+                            type="button"
+                            onClick={() => { setEditingSlotId(slot.id); setEditingSlotLabel(slot.label ?? '') }}
+                            className="p-1.5 rounded-lg hover:bg-mundial-purple/10 text-mundial-purple/40 hover:text-mundial-purple transition-colors"
+                            title="Editar etiqueta"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487a2.1 2.1 0 1 1 2.97 2.97L7.5 19.79l-4 1 1-4 12.362-12.303z" />
+                            </svg>
+                          </button>
+                          {/* Delete */}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSlot(slot.id)}
+                            disabled={deletingSlot === slot.id}
+                            className="p-1.5 rounded-lg hover:bg-mundial-red/10 text-mundial-red/50 hover:text-mundial-red transition-colors disabled:opacity-40"
+                            title="Eliminar slot"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ))}

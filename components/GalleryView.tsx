@@ -322,6 +322,30 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
     .map((m) => ({ ...m, completed: userSlots.get(m.user_id)?.size ?? 0 }))
     .sort((a, b) => b.completed - a.completed || (a.username ?? '').localeCompare(b.username ?? ''))
 
+  // ── Highlights (solo si hay stickers) ────────────────────────────
+  const highlights = stickers.length > 0 ? (() => {
+    const totalReactions = (s: ApprovedSticker) => {
+      const byEmoji = reactions.get(s.id)
+      if (!byEmoji) return 0
+      let total = 0
+      byEmoji.forEach((set) => { total += set.size })
+      return total
+    }
+
+    const mostReacted  = [...stickers].sort((a, b) => totalReactions(b) - totalReactions(a))[0]
+    const mostCommented = [...stickers].sort((a, b) => (commentCounts.get(b.id) ?? 0) - (commentCounts.get(a.id) ?? 0))[0]
+
+    const topByEmoji = EMOJIS.map((emoji) => {
+      const best = [...stickers].sort(
+        (a, b) => (reactions.get(b.id)?.get(emoji)?.size ?? 0) - (reactions.get(a.id)?.get(emoji)?.size ?? 0)
+      )[0]
+      const count = reactions.get(best.id)?.get(emoji)?.size ?? 0
+      return { emoji, sticker: best, count }
+    }).filter((e) => e.count > 0)
+
+    return { mostReacted, mostCommented, totalReactionsCount: totalReactions(mostReacted), topByEmoji }
+  })() : null
+
   const myRank = leaderboard.findIndex((m) => m.user_id === currentUserId) + 1
 
   if (loading) {
@@ -657,6 +681,82 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
           </div>
         </section>
       )}
+      {/* ── Highlights ───────────────────────────────────────────── */}
+      {highlights && (
+        <section className="space-y-3">
+          <h3 className="font-condensed text-[11px] font-bold tracking-[0.3em] uppercase text-mundial-purple/50">
+            Destacados
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+            {/* Más reaccionado */}
+            {highlights.totalReactionsCount > 0 && (
+              <div
+                className="glass-card rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:bg-mundial-yellow/5 transition-colors"
+                onClick={() => openComments(highlights.mostReacted)}
+              >
+                <img
+                  src={highlights.mostReacted.image_url}
+                  alt=""
+                  className="w-10 h-12 object-contain rounded-lg border border-mundial-purple/10 bg-mundial-cream shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="font-condensed text-[10px] font-bold tracking-[0.2em] uppercase text-mundial-purple/40 mb-0.5">
+                    Más reaccionado
+                  </p>
+                  <p className="font-display text-sm text-mundial-purple truncate">{highlights.mostReacted.username}</p>
+                  <p className="font-condensed text-xs font-bold text-mundial-yellow-dark">
+                    {highlights.totalReactionsCount} reacción{highlights.totalReactionsCount !== 1 ? 'es' : ''}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Más comentado */}
+            {(commentCounts.get(highlights.mostCommented.id) ?? 0) > 0 && (
+              <div
+                className="glass-card rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:bg-mundial-purple/5 transition-colors"
+                onClick={() => openComments(highlights.mostCommented)}
+              >
+                <img
+                  src={highlights.mostCommented.image_url}
+                  alt=""
+                  className="w-10 h-12 object-contain rounded-lg border border-mundial-purple/10 bg-mundial-cream shrink-0"
+                />
+                <div className="min-w-0">
+                  <p className="font-condensed text-[10px] font-bold tracking-[0.2em] uppercase text-mundial-purple/40 mb-0.5">
+                    Más comentado
+                  </p>
+                  <p className="font-display text-sm text-mundial-purple truncate">{highlights.mostCommented.username}</p>
+                  <p className="font-condensed text-xs font-bold text-mundial-purple/60">
+                    {commentCounts.get(highlights.mostCommented.id)} comentario{commentCounts.get(highlights.mostCommented.id) !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Top por emoji */}
+          {highlights.topByEmoji.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {highlights.topByEmoji.map(({ emoji, sticker, count }) => (
+                <div
+                  key={emoji}
+                  className="flex items-center gap-2 px-3 py-2 glass-card rounded-xl cursor-pointer hover:bg-mundial-yellow/5 transition-colors"
+                  onClick={() => openComments(sticker)}
+                >
+                  <span className="text-base">{emoji}</span>
+                  <div className="min-w-0">
+                    <p className="font-display text-xs text-mundial-purple truncate max-w-[80px]">{sticker.username}</p>
+                    <p className="font-condensed text-[10px] font-bold text-mundial-purple/40">{count}×</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* ── Modal: Comentarios ────────────────────────────────────── */}
     {commentSticker && (
       <div

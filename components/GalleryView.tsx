@@ -19,6 +19,14 @@ interface ApprovedSticker {
   username: string
 }
 
+interface CommentWithUser {
+  id: string
+  user_id: string
+  content: string
+  created_at: string
+  username: string
+}
+
 interface Props {
   album: Album
   currentUserId: string
@@ -32,8 +40,14 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
   const [userSlots, setUserSlots]         = useState<Map<string, Set<string>>>(new Map())
   const [reactions, setReactions]         = useState<ReactMap>(new Map())
   const [profileUserId, setProfileUserId] = useState<string | null>(null)
-  const [toggling, setToggling]           = useState<string | null>(null) // sticker_id+emoji key
-  const [sharing, setSharing]             = useState<string | null>(null) // sticker id being shared
+  const [toggling, setToggling]           = useState<string | null>(null)
+  const [sharing, setSharing]             = useState<string | null>(null)
+  const [commentSticker, setCommentSticker]       = useState<ApprovedSticker | null>(null)
+  const [comments, setComments]                   = useState<CommentWithUser[]>([])
+  const [commentCounts, setCommentCounts]         = useState<Map<string, number>>(new Map())
+  const [commentText, setCommentText]             = useState('')
+  const [loadingComments, setLoadingComments]     = useState(false)
+  const [submittingComment, setSubmittingComment] = useState(false)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
@@ -93,9 +107,20 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
       byEmoji.get(r.emoji)!.add(r.user_id)
     }
 
+    // Comment counts
+    const { data: countsRaw } = await supabase
+      .from('sticker_comments')
+      .select('sticker_id')
+      .eq('album_id', album.id)
+    const cMap = new Map<string, number>()
+    ;(countsRaw ?? []).forEach((r: { sticker_id: string }) => {
+      cMap.set(r.sticker_id, (cMap.get(r.sticker_id) ?? 0) + 1)
+    })
+
     setStickers(parsed)
     setUserSlots(us)
     setReactions(rx)
+    setCommentCounts(cMap)
     setLoading(false)
   }, [album.id])
 
@@ -179,6 +204,61 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
     } finally {
       setSharing(null)
     }
+  }
+
+  const openComments = async (sticker: ApprovedSticker) => {
+    setCommentSticker(sticker)
+    setComments([])
+    setCommentText('')
+    setLoadingComments(true)
+    const { data } = await supabase
+      .from('sticker_comments')
+      .select('id, user_id, content, created_at')
+      .eq('sticker_id', sticker.id)
+      .order('created_at', { ascending: true })
+    if (data && data.length > 0) {
+      const uids = Array.from(new Set((data as { user_id: string }[]).map((c) => c.user_id)))
+      const { data: profs } = await supabase.from('profiles').select('user_id, username').in('user_id', uids)
+      const pMap = new Map((profs ?? []).map((p: { user_id: string; username: string | null }) => [p.user_id, p.username]))
+      setComments((data as { id: string; user_id: string; content: string; created_at: string }[]).map((c) => ({
+        ...c, username: (pMap.get(c.user_id) ?? c.user_id.slice(0, 8)) as string,
+      })))
+    }
+    setLoadingComments(false)
+  }
+
+  const submitComment = async () => {
+    if (!commentSticker || !commentText.trim() || submittingComment) return
+    setSubmittingComment(true)
+    const content = commentText.trim()
+    const { data, error } = await supabase
+      .from('sticker_comments')
+      .insert({ sticker_id: commentSticker.id, album_id: album.id, user_id: currentUserId, content })
+      .select('id, user_id, content, created_at')
+      .single()
+    if (!error && data) {
+      const { data: prof } = await supabase.from('profiles').select('username').eq('user_id', currentUserId).single()
+      const newComment: CommentWithUser = { ...(data as { id: string; user_id: string; content: string; created_at: string }), username: prof?.username ?? currentUserId.slice(0, 8) }
+      setComments((prev) => [...prev, newComment])
+      setCommentCounts((prev) => {
+        const next = new Map(prev)
+        next.set(commentSticker.id, (next.get(commentSticker.id) ?? 0) + 1)
+        return next
+      })
+      setCommentText('')
+    }
+    setSubmittingComment(false)
+  }
+
+  const deleteComment = async (commentId: string) => {
+    if (!commentSticker) return
+    await supabase.from('sticker_comments').delete().eq('id', commentId)
+    setComments((prev) => prev.filter((c) => c.id !== commentId))
+    setCommentCounts((prev) => {
+      const next = new Map(prev)
+      next.set(commentSticker.id, Math.max(0, (next.get(commentSticker.id) ?? 1) - 1))
+      return next
+    })
   }
 
   // ── Derived ──────────────────────────────────────────────────────
@@ -333,6 +413,20 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                                 {isMe ? 'Tú' : s.username}
                               </button>
 
+                              {/* Comment button */}
+                              <button
+                                onClick={() => openComments(s)}
+                                className="flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[10px] hover:bg-mundial-purple/8 text-mundial-purple/40 hover:text-mundial-purple transition-all leading-none"
+                                aria-label="Ver comentarios"
+                              >
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
+                                {(commentCounts.get(s.id) ?? 0) > 0 && (
+                                  <span className="font-condensed font-bold text-[9px]">{commentCounts.get(s.id)}</span>
+                                )}
+                              </button>
+
                               {/* Reaction bar */}
                               <div className="flex items-center gap-0.5">
                                 {EMOJIS.map((emoji) => {
@@ -447,6 +541,105 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
           </div>
         </section>
       )}
+      {/* ── Modal: Comentarios ────────────────────────────────────── */}
+    {commentSticker && (
+      <div
+        className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 animate-fade-in"
+        onClick={(e) => { if (e.target === e.currentTarget) setCommentSticker(null) }}
+      >
+        <div className="w-full max-w-lg glass-card rounded-t-3xl shadow-2xl flex flex-col max-h-[80vh]">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-5 pt-5 pb-4 border-b border-mundial-purple/10 shrink-0">
+            <img
+              src={commentSticker.image_url}
+              alt=""
+              className="w-10 h-12 object-contain rounded-lg border border-mundial-purple/10 bg-mundial-cream shrink-0"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="font-display text-sm tracking-wide uppercase text-mundial-purple truncate">
+                Sticker de {commentSticker.username}
+              </p>
+              <p className="text-xs text-mundial-purple/40">
+                {comments.length} comentario{comments.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <button
+              onClick={() => setCommentSticker(null)}
+              className="w-8 h-8 rounded-xl hover:bg-mundial-purple/8 text-mundial-purple/40 hover:text-mundial-purple transition-colors flex items-center justify-center shrink-0"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Comments list */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[80px]">
+            {loadingComments ? (
+              <div className="space-y-2">
+                {[1,2].map((i) => <div key={i} className="h-10 rounded-xl bg-mundial-cream animate-pulse" />)}
+              </div>
+            ) : comments.length === 0 ? (
+              <p className="text-center text-xs text-mundial-purple/30 py-6 font-condensed font-bold tracking-wider uppercase">
+                Sin comentarios. ¡Sé el primero!
+              </p>
+            ) : (
+              comments.map((c) => (
+                <div key={c.id} className="flex items-start gap-2.5 group/comment">
+                  <div className="shrink-0 w-7 h-7 rounded-full bg-mundial-purple/10 flex items-center justify-center">
+                    <span className="text-[10px] font-condensed font-bold text-mundial-purple/60 uppercase">
+                      {c.username.slice(0, 2)}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-[11px] font-condensed font-bold tracking-wide uppercase text-mundial-purple/70">
+                        {c.user_id === currentUserId ? 'Tú' : c.username}
+                      </span>
+                      <span className="text-[9px] text-mundial-purple/30">
+                        {new Date(c.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-mundial-purple/80 leading-snug break-words">{c.content}</p>
+                  </div>
+                  {c.user_id === currentUserId && (
+                    <button
+                      onClick={() => deleteComment(c.id)}
+                      className="shrink-0 opacity-0 group-hover/comment:opacity-100 w-6 h-6 rounded-lg hover:bg-mundial-red/10 text-mundial-red/50 hover:text-mundial-red flex items-center justify-center transition-all"
+                      aria-label="Eliminar comentario"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Input */}
+          <div className="flex gap-2 p-4 border-t border-mundial-purple/10 shrink-0">
+            <input
+              type="text"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment() } }}
+              placeholder="Escribe un comentario…"
+              maxLength={300}
+              className="flex-1 px-3 py-2 text-sm rounded-xl border-2 border-mundial-purple/15 bg-white/70 text-mundial-purple placeholder:text-mundial-purple/30 focus:outline-none focus:border-mundial-purple/40 transition-colors"
+            />
+            <button
+              onClick={submitComment}
+              disabled={!commentText.trim() || submittingComment}
+              className="px-4 py-2 bg-mundial-purple hover:bg-mundial-purple/90 disabled:opacity-40 text-white font-display text-xs tracking-wider uppercase rounded-xl transition-colors shrink-0"
+            >
+              {submittingComment ? '…' : 'Enviar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   )
 }

@@ -222,3 +222,12 @@ export type Notification = {
   read: boolean
   created_at: string
 }
+
+export type StickerComment = {
+  id: string
+  sticker_id: string
+  album_id: string
+  user_id: string
+  content: string
+  created_at: string
+}

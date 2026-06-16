@@ -298,6 +298,8 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
   }
 
   // ── Derived ──────────────────────────────────────────────────────
+  const isAlbumAdmin = members.some((m) => m.user_id === currentUserId && m.role === 'admin')
+
   const bySlot = new Map<string, ApprovedSticker[]>()
   stickers.forEach((s) => {
     if (!bySlot.has(s.slot_id)) bySlot.set(s.slot_id, [])
@@ -818,7 +820,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                     </div>
                     <p className="text-sm text-mundial-purple/80 leading-snug break-words">{c.content}</p>
                   </div>
-                  {c.user_id === currentUserId && (
+                  {(c.user_id === currentUserId || isAlbumAdmin) && (
                     <button
                       onClick={() => deleteComment(c.id)}
                       className="shrink-0 opacity-0 group-hover/comment:opacity-100 w-6 h-6 rounded-lg hover:bg-mundial-red/10 text-mundial-red/50 hover:text-mundial-red flex items-center justify-center transition-all"

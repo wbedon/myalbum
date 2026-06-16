@@ -95,6 +95,12 @@ export default async function PublicGalleryPage({ params }: { params: { albumId:
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <a
+              href="/explore"
+              className="font-condensed text-[10px] font-bold tracking-wider uppercase text-mundial-purple/40 hover:text-mundial-purple transition-colors"
+            >
+              Explorar
+            </a>
             <span className="font-condensed text-[10px] font-bold tracking-wider uppercase text-mundial-purple/40 bg-mundial-purple/8 px-2 py-1 rounded-full">
               {stickers.length} sticker{stickers.length !== 1 ? 's' : ''} aprobados
             </span>

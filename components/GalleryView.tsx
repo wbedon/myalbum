@@ -6,8 +6,13 @@ import { supabase, type Album, type AlbumSlot, type AlbumMember } from '@/lib/su
 import Avatar from './Avatar'
 import UserProfileModal from './UserProfileModal'
 
-const EMOJIS = ['❤️', '🔥', '⭐', '😂'] as const
-type Emoji = typeof EMOJIS[number]
+const QUICK_EMOJIS = ['❤️', '🔥', '⭐', '😂', '👏', '🎉']
+const PICKER_EMOJIS = [
+  '😍','🤩','😱','🥺','😭','💀','🤣','😤',
+  '🥳','💪','👑','🏆','🎯','✨','💥','🌟',
+  '🐐','💯','🤝','🎸','🔮','🏅','🫶','🙌',
+]
+type Emoji = string
 
 // sticker_id → emoji → Set<user_id>
 type ReactMap = Map<string, Map<string, Set<string>>>
@@ -46,6 +51,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
   const [filterUserId, setFilterUserId]   = useState<string | null>(null)
   const [filterSlot, setFilterSlot]       = useState<'all' | 'with' | 'without'>('all')
   const [sortBy, setSortBy]               = useState<'slot' | 'reactions' | 'comments'>('slot')
+  const [pickerSticker, setPickerSticker] = useState<string | null>(null)
   const [exporting, setExporting]         = useState(false)
   const [commentSticker, setCommentSticker]       = useState<ApprovedSticker | null>(null)
   const [comments, setComments]                   = useState<CommentWithUser[]>([])
@@ -355,13 +361,15 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
     const mostReacted  = [...stickers].sort((a, b) => totalReactions(b) - totalReactions(a))[0]
     const mostCommented = [...stickers].sort((a, b) => (commentCounts.get(b.id) ?? 0) - (commentCounts.get(a.id) ?? 0))[0]
 
-    const topByEmoji = EMOJIS.map((emoji) => {
+    const allEmojisArr: string[] = []
+    stickers.forEach((s) => reactions.get(s.id)?.forEach((_, e) => { if (!allEmojisArr.includes(e)) allEmojisArr.push(e) }))
+    const topByEmoji = allEmojisArr.map((emoji) => {
       const best = [...stickers].sort(
         (a, b) => (reactions.get(b.id)?.get(emoji)?.size ?? 0) - (reactions.get(a.id)?.get(emoji)?.size ?? 0)
       )[0]
       const count = reactions.get(best.id)?.get(emoji)?.size ?? 0
       return { emoji, sticker: best, count }
-    }).filter((e) => e.count > 0)
+    }).filter((e) => e.count > 0).sort((a, b) => b.count - a.count).slice(0, 6)
 
     return { mostReacted, mostCommented, totalReactionsCount: totalReactions(mostReacted), topByEmoji }
   })() : null
@@ -625,8 +633,8 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                               </button>
 
                               {/* Reaction bar */}
-                              <div className="flex items-center gap-0.5">
-                                {EMOJIS.map((emoji) => {
+                              <div className="relative flex items-center gap-0.5">
+                                {QUICK_EMOJIS.map((emoji) => {
                                   const count   = sxReactions?.get(emoji)?.size ?? 0
                                   const reacted = sxReactions?.get(emoji)?.has(currentUserId) ?? false
                                   const isActive = toggling === `${s.id}:${emoji}`
@@ -651,6 +659,29 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                                     </button>
                                   )
                                 })}
+                                {/* Picker toggle */}
+                                <button
+                                  onClick={() => setPickerSticker(pickerSticker === s.id ? null : s.id)}
+                                  className="flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-mundial-purple/30 hover:text-mundial-purple hover:bg-mundial-purple/8 transition-all leading-none"
+                                  title="Más emojis"
+                                >
+                                  +
+                                </button>
+                                {/* Emoji picker popover */}
+                                {pickerSticker === s.id && (
+                                  <div className="absolute bottom-full left-0 mb-1 z-30 bg-white border border-mundial-purple/15 rounded-2xl shadow-xl p-2 grid grid-cols-8 gap-0.5">
+                                    {PICKER_EMOJIS.map((pe) => (
+                                      <button
+                                        key={pe}
+                                        onClick={() => { handleToggle(s.id, pe); setPickerSticker(null) }}
+                                        className="w-7 h-7 flex items-center justify-center text-base rounded-lg hover:bg-mundial-yellow/20 transition-colors"
+                                        title={pe}
+                                      >
+                                        {pe}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )

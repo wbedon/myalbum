@@ -189,6 +189,9 @@ supabase/migrations/          # 38 migraciones aplicadas en producción
 | B | Comentarios en galería pública | En `/gallery/[albumId]`, click en el count de comentarios abre una lista read-only de los comentarios del sticker. Sin auth requerido. |
 | C | Filtro por usuario en galería pública | En `/gallery/[albumId]`, click en el nombre/avatar de un participante filtra la grilla para mostrar solo sus stickers. |
 | D | Bulk-edit de etiquetas de slots | En la pestaña Slots del panel admin, un textarea con formato `1:Portero\n2:Defensa\n3:Arquero` que actualiza todas las etiquetas de un golpe via UPDATE masivo. |
+| E | Exportar participantes a CSV | En la pestaña Participantes, botón que descarga CSV con username, email, slot asignado y estado del sticker. |
+| F | Fecha límite de envío de stickers | Campo fecha/hora en "Editar álbum". Pasada esa fecha el formulario de envío se bloquea y muestra "Período cerrado". Countdown visible mientras está activo. |
+| G | Buscador en galería interna | Campo de búsqueda que filtra stickers por número de slot o etiqueta (ej: "Portero", "3"). |
 
 ---
 

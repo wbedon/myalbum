@@ -10,6 +10,7 @@ interface Sticker {
   image_url: string
   slot_id: string
   username: string
+  reactions: { emoji: string; count: number }[]
 }
 
 interface Slot {
@@ -48,6 +49,27 @@ async function getGalleryData(albumId: string) {
     username: (profileMap.get(s.user_id) ?? s.user_id.slice(0, 8)) as string,
   }))
 
+  const stickerIds = stickers.map((s) => s.id)
+  const { data: reactionsRaw } = stickerIds.length > 0
+    ? await db.from('sticker_reactions').select('sticker_id, emoji').in('sticker_id', stickerIds)
+    : { data: [] }
+
+  // sticker_id → emoji → count
+  const reactionMap = new Map<string, Map<string, number>>()
+  ;(reactionsRaw ?? []).forEach((r: { sticker_id: string; emoji: string }) => {
+    if (!reactionMap.has(r.sticker_id)) reactionMap.set(r.sticker_id, new Map())
+    const byEmoji = reactionMap.get(r.sticker_id)!
+    byEmoji.set(r.emoji, (byEmoji.get(r.emoji) ?? 0) + 1)
+  })
+
+  const stickersWithReactions: Sticker[] = stickers.map((s) => {
+    const byEmoji = reactionMap.get(s.id)
+    const reactions: { emoji: string; count: number }[] = []
+    byEmoji?.forEach((count, emoji) => reactions.push({ emoji, count }))
+    reactions.sort((a, b) => b.count - a.count)
+    return { ...s, reactions }
+  })
+
   const { data: slotsRaw } = await db
     .from('album_slots')
     .select('id, slot_number, label')
@@ -56,12 +78,12 @@ async function getGalleryData(albumId: string) {
 
   const slots: Slot[] = (slotsRaw ?? []) as Slot[]
   const bySlot = new Map<string, Sticker[]>()
-  stickers.forEach((s) => {
+  stickersWithReactions.forEach((s) => {
     if (!bySlot.has(s.slot_id)) bySlot.set(s.slot_id, [])
     bySlot.get(s.slot_id)!.push(s)
   })
 
-  return { album, stickers, slots, bySlot }
+  return { album, stickers: stickersWithReactions, slots, bySlot }
 }
 
 export async function generateMetadata({ params }: { params: { albumId: string } }): Promise<Metadata> {
@@ -162,6 +184,19 @@ export default async function PublicGalleryPage({ params }: { params: { albumId:
                           <span className="text-[10px] font-condensed font-bold tracking-wider uppercase text-mundial-purple/50 max-w-[80px] truncate text-center">
                             {s.username}
                           </span>
+                          {s.reactions.length > 0 && (
+                            <div className="flex items-center gap-0.5 flex-wrap justify-center max-w-[90px]">
+                              {s.reactions.slice(0, 4).map(({ emoji, count }) => (
+                                <span
+                                  key={emoji}
+                                  className="flex items-center gap-0.5 text-[9px] font-condensed font-bold text-mundial-purple/60 bg-mundial-purple/6 px-1 py-0.5 rounded-full"
+                                >
+                                  <span className="text-[10px]">{emoji}</span>
+                                  {count}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

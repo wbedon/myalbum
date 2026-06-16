@@ -53,9 +53,13 @@ export default function UserProfileModal({ userId, currentUserId, onClose }: Pro
 
   const [stats, setStats]           = useState<UserStats | null>(null)
   const [loading, setLoading]       = useState(true)
-  const [editingBio, setEditingBio] = useState(false)
-  const [bioValue, setBioValue]     = useState('')
-  const [saving, setSaving]         = useState(false)
+  const [editingBio, setEditingBio]           = useState(false)
+  const [bioValue, setBioValue]               = useState('')
+  const [saving, setSaving]                   = useState(false)
+  const [editingUsername, setEditingUsername] = useState(false)
+  const [usernameValue, setUsernameValue]     = useState('')
+  const [usernameError, setUsernameError]     = useState<string | null>(null)
+  const [savingUsername, setSavingUsername]   = useState(false)
 
   const [changingPw, setChangingPw]   = useState(false)
   const [newPw, setNewPw]             = useState('')
@@ -74,6 +78,7 @@ export default function UserProfileModal({ userId, currentUserId, onClose }: Pro
         const s = data as UserStats
         setStats(s)
         setBioValue(s.bio ?? '')
+        setUsernameValue(s.username ?? '')
       }
       setLoading(false)
     }
@@ -102,6 +107,26 @@ export default function UserProfileModal({ userId, currentUserId, onClose }: Pro
       setNewPw(''); setConfirmPw('')
       setTimeout(() => { setChangingPw(false); setPwSuccess(false) }, 2000)
     }
+  }
+
+  async function saveUsername() {
+    if (!stats) return
+    const trimmed = usernameValue.trim()
+    if (!trimmed) { setUsernameError('El username no puede estar vacío.'); return }
+    if (trimmed === stats.username) { setEditingUsername(false); return }
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(trimmed)) {
+      setUsernameError('Solo letras, números y _ (3-20 caracteres).')
+      return
+    }
+    setSavingUsername(true)
+    setUsernameError(null)
+    const { data: existing } = await supabase
+      .from('profiles').select('user_id').eq('username', trimmed).single()
+    if (existing) { setUsernameError('Ese username ya está en uso.'); setSavingUsername(false); return }
+    await supabase.from('profiles').update({ username: trimmed }).eq('user_id', userId)
+    setStats((prev) => prev ? { ...prev, username: trimmed } : prev)
+    setEditingUsername(false)
+    setSavingUsername(false)
   }
 
   async function saveBio() {
@@ -155,9 +180,46 @@ export default function UserProfileModal({ userId, currentUserId, onClose }: Pro
               <div className="flex flex-col items-center gap-3 pt-2">
                 <Avatar username={stats.username ?? '?'} size="xl" />
                 <div className="text-center space-y-1">
-                  <h2 className="font-display text-xl tracking-widest uppercase text-mundial-purple">
-                    {stats.username}
-                  </h2>
+                  {editingUsername && isOwn ? (
+                    <div className="flex flex-col items-center gap-1.5">
+                      <input
+                        value={usernameValue}
+                        onChange={(e) => { setUsernameValue(e.target.value); setUsernameError(null) }}
+                        maxLength={20}
+                        autoFocus
+                        className="w-40 px-2 py-1 text-sm text-center rounded-xl border-2 border-mundial-purple/20 bg-white/70 text-mundial-purple focus:outline-none focus:border-mundial-yellow/60 font-display tracking-wider uppercase transition-colors"
+                      />
+                      {usernameError && <p className="text-[10px] text-mundial-red">{usernameError}</p>}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setEditingUsername(false); setUsernameValue(stats.username ?? ''); setUsernameError(null) }}
+                          className="px-3 py-1 text-xs text-mundial-purple/50 hover:text-mundial-purple rounded-lg transition-colors"
+                        >Cancelar</button>
+                        <button
+                          onClick={saveUsername}
+                          disabled={savingUsername}
+                          className="px-3 py-1 text-xs bg-mundial-yellow hover:bg-mundial-yellow-dark disabled:opacity-60 text-mundial-purple font-bold rounded-lg transition-colors"
+                        >{savingUsername ? '…' : 'Guardar'}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-1.5">
+                      <h2 className="font-display text-xl tracking-widest uppercase text-mundial-purple">
+                        {stats.username}
+                      </h2>
+                      {isOwn && (
+                        <button
+                          onClick={() => setEditingUsername(true)}
+                          className="p-1 rounded-lg text-mundial-purple/30 hover:text-mundial-purple hover:bg-mundial-purple/10 transition-colors"
+                          title="Editar username"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center justify-center gap-2">
                     {stats.role === 'superadmin' && (
                       <span className="text-[9px] font-condensed font-bold tracking-[0.2em] uppercase bg-mundial-yellow/30 text-mundial-yellow-dark px-2 py-0.5 rounded-full">
@@ -232,6 +294,21 @@ export default function UserProfileModal({ userId, currentUserId, onClose }: Pro
                   </div>
                 )}
               </div>
+
+              {/* Enlace al perfil público */}
+              {stats.username && (
+                <a
+                  href={`/u/${encodeURIComponent(stats.username)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1.5 py-2 text-xs font-condensed font-bold tracking-wider uppercase text-mundial-purple/40 hover:text-mundial-purple transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                  Ver perfil público
+                </a>
+              )}
 
               {/* Stats */}
               <div className="grid grid-cols-3 gap-2">

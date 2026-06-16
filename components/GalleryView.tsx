@@ -413,11 +413,25 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
           </div>
         )}
 
+        {album.is_public && (
+          <a
+            href={`/gallery/${album.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 py-3 bg-mundial-green/10 border border-mundial-green/30 rounded-2xl hover:bg-mundial-green/20 transition-all"
+          >
+            <svg className="w-4 h-4 text-mundial-green shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+            </svg>
+            <span className="font-condensed text-sm font-bold text-mundial-green">Ver pública</span>
+          </a>
+        )}
+
         {stickers.length > 0 && (
           <button
             onClick={handleExport}
             disabled={exporting}
-            className="ml-auto flex items-center gap-2 px-4 py-3 bg-mundial-purple/8 border border-mundial-purple/20 rounded-2xl hover:bg-mundial-purple/15 disabled:opacity-50 transition-all"
+            className="flex items-center gap-2 px-4 py-3 bg-mundial-purple/8 border border-mundial-purple/20 rounded-2xl hover:bg-mundial-purple/15 disabled:opacity-50 transition-all"
           >
             {exporting ? (
               <svg className="w-4 h-4 text-mundial-purple animate-spin" fill="none" viewBox="0 0 24 24">

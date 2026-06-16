@@ -473,7 +473,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                 key={opt}
                 onClick={() => setFilterSlot(opt)}
                 className={[
-                  'px-3 py-1 rounded-full font-condensed text-[10px] font-bold tracking-wider uppercase transition-all',
+                  'px-3 py-1.5 rounded-full font-condensed text-[10px] font-bold tracking-wider uppercase transition-all',
                   filterSlot === opt
                     ? 'bg-mundial-purple text-white'
                     : 'bg-mundial-purple/8 text-mundial-purple/50 hover:bg-mundial-purple/15',
@@ -501,7 +501,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
           {(filterSlot !== 'all' || filterUserId) && (
             <button
               onClick={() => { setFilterSlot('all'); setFilterUserId(null) }}
-              className="px-2 py-1 rounded-full font-condensed text-[10px] font-bold tracking-wider uppercase text-mundial-red/60 hover:text-mundial-red hover:bg-mundial-red/8 transition-all"
+              className="px-3 py-1.5 rounded-full font-condensed text-[10px] font-bold tracking-wider uppercase text-mundial-red/60 hover:text-mundial-red hover:bg-mundial-red/8 transition-all"
             >
               × Limpiar
             </button>
@@ -519,7 +519,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                 key={key}
                 onClick={() => setSortBy(key)}
                 className={[
-                  'px-2.5 py-1 rounded-full font-condensed text-[10px] font-bold tracking-wider uppercase transition-all',
+                  'px-2.5 py-1.5 rounded-full font-condensed text-[10px] font-bold tracking-wider uppercase transition-all',
                   sortBy === key
                     ? 'bg-mundial-purple text-white'
                     : 'bg-mundial-purple/8 text-mundial-purple/50 hover:bg-mundial-purple/15',
@@ -621,7 +621,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                               {/* Comment button */}
                               <button
                                 onClick={() => openComments(s)}
-                                className="flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[10px] hover:bg-mundial-purple/8 text-mundial-purple/40 hover:text-mundial-purple transition-all leading-none"
+                                className="flex items-center gap-0.5 px-2 py-1.5 rounded-full text-[10px] hover:bg-mundial-purple/8 text-mundial-purple/40 hover:text-mundial-purple transition-all leading-none"
                                 aria-label="Ver comentarios"
                               >
                                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -645,7 +645,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                                       disabled={isActive}
                                       title={emoji}
                                       className={[
-                                        'flex items-center gap-0.5 px-1 py-0.5 rounded-full text-[10px] transition-all leading-none',
+                                        'flex items-center gap-0.5 px-1.5 py-1 rounded-full text-[10px] transition-all leading-none',
                                         reacted
                                           ? 'bg-mundial-yellow/30 text-mundial-purple scale-110'
                                           : 'hover:bg-mundial-purple/8 text-mundial-purple/40 hover:text-mundial-purple',
@@ -662,14 +662,14 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
                                 {/* Picker toggle */}
                                 <button
                                   onClick={() => setPickerSticker(pickerSticker === s.id ? null : s.id)}
-                                  className="flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-mundial-purple/30 hover:text-mundial-purple hover:bg-mundial-purple/8 transition-all leading-none"
+                                  className="flex items-center justify-center w-7 h-7 rounded-full text-[11px] font-bold text-mundial-purple/30 hover:text-mundial-purple hover:bg-mundial-purple/8 transition-all leading-none"
                                   title="Más emojis"
                                 >
                                   +
                                 </button>
                                 {/* Emoji picker popover */}
                                 {pickerSticker === s.id && (
-                                  <div className="absolute bottom-full left-0 mb-1 z-30 bg-white border border-mundial-purple/15 rounded-2xl shadow-xl p-2 grid grid-cols-8 gap-0.5">
+                                  <div className="absolute bottom-full left-0 mb-1 z-30 bg-white border border-mundial-purple/15 rounded-2xl shadow-xl p-2 grid grid-cols-6 sm:grid-cols-8 gap-0.5">
                                     {PICKER_EMOJIS.map((pe) => (
                                       <button
                                         key={pe}
@@ -865,7 +865,7 @@ export default function GalleryView({ album, currentUserId, slots, members }: Pr
         className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 animate-fade-in"
         onClick={(e) => { if (e.target === e.currentTarget) setCommentSticker(null) }}
       >
-        <div className="w-full max-w-lg glass-card rounded-t-3xl shadow-2xl flex flex-col max-h-[80vh]">
+        <div className="w-full max-w-[min(512px,100vw)] glass-card rounded-t-3xl shadow-2xl flex flex-col max-h-[85vh]">
           {/* Header */}
           <div className="flex items-center gap-3 px-5 pt-5 pb-4 border-b border-mundial-purple/10 shrink-0">
             <img

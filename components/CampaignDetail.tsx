@@ -766,7 +766,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
               </button>
 
               {shareOpen && (
-                <div className="absolute right-0 top-12 z-30 w-80 glass-card rounded-2xl shadow-xl border border-mundial-purple/10 p-4 space-y-4 animate-fade-in">
+                <div className="absolute right-0 top-12 z-30 w-[min(320px,90vw)] glass-card rounded-2xl shadow-xl border border-mundial-purple/10 p-4 space-y-4 animate-fade-in">
                   {/* Status toggle */}
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -805,7 +805,7 @@ export default function CampaignDetail({ album, currentUserId, canAssignAdmin, u
                         <input
                           readOnly
                           value={publicUrl}
-                          className="flex-1 min-w-0 text-xs px-3 py-2 rounded-lg bg-mundial-cream border border-mundial-purple/15 text-mundial-purple/70 font-mono truncate"
+                          className="flex-1 min-w-0 text-xs px-3 py-2 rounded-lg bg-mundial-cream border border-mundial-purple/15 text-mundial-purple/70 font-mono overflow-hidden text-ellipsis"
                         />
                         <button
                           onClick={handleCopyLink}

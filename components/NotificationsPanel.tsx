@@ -193,7 +193,7 @@ export default function NotificationsPanel({ albumId, refreshKey, onTabBadge }: 
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-80 max-h-[420px] overflow-y-auto rounded-2xl glass-card shadow-2xl z-50 border border-white/20">
+        <div className="absolute right-0 mt-2 w-[min(320px,92vw)] max-h-[70vh] overflow-y-auto rounded-2xl glass-card shadow-2xl z-50 border border-white/20">
           <div className="flex items-center justify-between p-3 border-b border-white/20 sticky top-0 glass-card">
             <span className="font-semibold text-sm">Notificaciones</span>
             {unread > 0 && (
